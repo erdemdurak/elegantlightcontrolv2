@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Ambient Light Controller",
+    "slug": "ambient-light-controller",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Allow Ambient Light Controller to find and connect to your BLE ambient controller."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ambientlightcontroller.mobile",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Allow Ambient Light Controller to find and connect to your BLE ambient controller.",
+        "NSBluetoothPeripheralUsageDescription": "Allow Ambient Light Controller to communicate with your BLE ambient controller."
+      }
+    },
+    "android": {
+      "package": "com.ambientlightcontroller.mobile",
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    }
+  }
+}
