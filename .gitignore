@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+
+# expo / build output
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# native build artefacts
+ios/
+android/
+*.ipa
+*.aab
+
+# vendor app reverse-engineering artefacts — do not commit third-party app code
+*.apk
+*.xapk
+*.apks
+vendor-app-unpacked/
+vendor-app-src/
+smartled-src/
+
+# secrets / local config
+.env
+.env.local
+*.p8
+*.p12
+*.mobileprovision
+*.jks
+*.keystore
+
+# macOS
+.DS_Store

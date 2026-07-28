@@ -1,54 +1,41 @@
 export type AmbientMode = "monochrome" | "gradient" | "strobe" | "breathe";
 
-export type ZoneKey = "zoneA" | "zoneB";
-
 export type GradientSpeed = 1 | 2 | 3 | 4 | 5;
 
-export type ProtocolProfile = "json-v1" | "at-rgb-v1" | "frame-v1";
+/** Which strip the controls are currently driving. */
+export type AreaKey = "area1" | "area2";
 
-export type SceneGroup = "Day" | "Night" | "Cruise" | "Party" | "Calm" | "Custom";
+export type ControlTarget = AreaKey | "both";
 
-export type ZoneSettings = {
+/**
+ * The target + protocol combination confirmed to control the strip, saved once the
+ * Protocol Sweep identifies it so normal sends stop guessing.
+ *
+ * `zoneVariantId` is filled in separately by the Zone Sweep. While it is null the
+ * app can only broadcast to both areas at once.
+ */
+export type LockedProfile = {
+  serviceUuid: string;
+  characteristicUuid: string;
+  familyId: string;
+  familyLabel: string;
+  zoneVariantId?: string | null;
+  zoneVariantLabel?: string | null;
+};
+
+export type LightSettings = {
   hue: number;
   saturation: number;
   brightness: number;
   mode: AmbientMode;
-  gradientColors: string[];
   speed: GradientSpeed;
+  /** Colours cycled by the app-driven gradient effect. 2-6 entries. */
+  gradientColors: string[];
 };
 
 export type AppStateSnapshot = {
-  zoneA: ZoneSettings;
-  zoneB: ZoneSettings;
+  area1: LightSettings;
+  area2: LightSettings;
   savedPalette: string[];
-  scenes?: ScenePreset[];
-  protocolProfile?: ProtocolProfile;
-  autoSendEnabled?: boolean;
-  autoSendIntervalMs?: number;
-};
-
-export type ScenePreset = {
-  id: string;
-  name: string;
-  group: SceneGroup;
-  zoneA: ZoneSettings;
-  zoneB: ZoneSettings;
-  createdAt: number;
-};
-
-export type BleCommand = {
-  zone: ZoneKey;
-  mode: AmbientMode;
-  rgb: {
-    r: number;
-    g: number;
-    b: number;
-  };
-  brightness: number;
-  speed: GradientSpeed;
-  gradient: Array<{
-    r: number;
-    g: number;
-    b: number;
-  }>;
+  lockedProfile?: LockedProfile | null;
 };
