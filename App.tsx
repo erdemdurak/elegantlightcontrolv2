@@ -34,7 +34,7 @@ import { hexToHsv, hsvToHex } from "./src/utils/color";
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "a5-v7 · SmartLed A5 protocol · FFB0/FFB1";
+const BUILD_LABEL = "a5-v8 · SmartLed A5 protocol · FFB0/FFB1";
 
 const presetColors = [
   "#FF0000",
