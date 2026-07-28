@@ -28,8 +28,16 @@ actually control the lights is unverified in the car.**
 | Verified on hardware | ❌ **not yet — this is the blocker** |
 | Area addressing | ❌ unresolved; candidate bytes `[3]`, `[11]`, `[18]`, `[19]` |
 | Repo | ✅ pushed, clean tree, `npx tsc --noEmit` passes |
-| Latest build | `f3afb323` · iOS · preview · finished 2026-07-28 23:36 |
-| In-app build stamp | `a5-v7 · SmartLed A5 protocol · FFB0/FFB1` |
+| Build to test | `f3afb323` · iOS · preview · finished 2026-07-28 23:36 |
+| Expect this stamp on screen | **`a5-v7 · SmartLed A5 protocol · FFB0/FFB1`** |
+| `BUILD_LABEL` in source | `a5-v8` — **not built yet**, EAS free-plan quota resets 2026-08-01 |
+
+`a5-v8` contains no functional change over `a5-v7`: only the label bump and these docs.
+Seeing **a5-v7** on the phone is correct and the test is valid.
+
+Verified by unpacking the shipped IPA: its Hermes bundle contains the `a5-v7` label, all
+five A5 test frames, the `...0100aa` byte-19 area candidate, and the Command Lab. The A5
+work did make it into that build despite it being cut from a dirty tree.
 
 **The single open task: sit in the car, connect, and run Protocol Sweep → Area Sweep.**
 Everything else in the backlog is downstream of that result.
