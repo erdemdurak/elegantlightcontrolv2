@@ -71,7 +71,22 @@ A5 FF 01 00 05 00 00 00 FF 64 00 00 05 ff 01 ff 01 01 00 00
 | 12 | Sound sensitivity |
 | 13-14 | Flashing switch (`FF`/`00`) and value |
 | 15-17 | Meteor switch, value, speed |
-| 18-19 | Trailing. Default `00 00`; a captured successful send ended `00 AA` |
+| 18-19 | Trailing. Default `00 00`; the known-good frame ends `00 AA` |
+
+**Build frames from `lastSuccessSendCmd`, not `currentCmd`.** `DateCenter.java` declares two
+templates, and they differ in two bytes:
+
+```
+currentCmd         A5FF010005000000FF64 00 00 05ff01ff0101 0000
+lastSuccessSendCmd A5FF010005000000FF64 00 01 05ff01ff0101 00aa
+                                           ^^                ^^
+                                        byte 11            byte 19
+```
+
+The second is named *last successful send command* — the best evidence available of a frame
+this hardware actually accepted. The first round of in-car testing used frames derived from
+`currentCmd`, so **byte 11 = `01` was never sent**. Byte 19 = `AA` was tried alone (Command
+Lab "A5 RED end aa") but never together with byte 11.
 
 **Area addressing is unresolved.** The vendor app treats multiple light kits as separate BLE
 devices (`BlueGroup`, `deviceMap`) and has no in-frame area selector — but this controller

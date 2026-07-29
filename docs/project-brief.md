@@ -65,16 +65,26 @@ service is the real one.
 
 ### Test frames — send to `FFB1`
 
-Verified 20 bytes each, generated programmatically from the recovered frame layout. These are
-the first buttons in the Command Lab.
+**Round 2 — built from `lastSuccessSendCmd` (byte 11 = `01`, byte 19 = `aa`).** Paste into
+the hex console with target `FFB1`; no build needed.
 
 | | Frame |
 | --- | --- |
-| RED | `a5ff010005ff00000064000005ff01ff01010000` |
-| GREEN | `a5ff01000500ff000064000005ff01ff01010000` |
-| BLUE | `a5ff0100050000ff0064000005ff01ff01010000` |
-| WHITE | `a5ff010005000000ff64000005ff01ff01010000` |
-| OFF | `a500010005000000ff64000005ff01ff01010000` |
+| RED | `a5ff010005ff00000064000105ff01ff010100aa` |
+| GREEN | `a5ff01000500ff000064000105ff01ff010100aa` |
+| BLUE | `a5ff0100050000ff0064000105ff01ff010100aa` |
+| WHITE | `a5ff010005000000ff64000105ff01ff010100aa` |
+| OFF | `a500010005000000ff64000105ff01ff010100aa` |
+
+Isolation probes on RED, if round 2 works and you want to know which byte mattered:
+
+| Bytes 11 / 19 | Frame | |
+| --- | --- | --- |
+| `01` / `00` | `a5ff010005ff00000064000105ff01ff01010000` | untested |
+| `00` / `aa` | `a5ff010005ff00000064000005ff01ff010100aa` | tested, failed |
+| `00` / `00` | `a5ff010005ff00000064000005ff01ff01010000` | **round 1 — failed** |
+
+Round 1 frames came from the `currentCmd` template and are the ones already ruled out.
 
 ### What the failures already established
 
