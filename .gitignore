@@ -1,17 +1,56 @@
 # dependencies
 node_modules/
+npm-debug.log
+yarn-error.log
 
-# expo / build output
-.expo/
-dist/
-web-build/
-*.tsbuildinfo
+# NOTE: ios/ and android/ ARE tracked here. This is bare React Native — the
+# native projects are source, not generated output. Only their build artefacts
+# are ignored below. (v1 ignored them because Expo generated them on demand.)
 
-# native build artefacts
-ios/
-android/
+# Xcode
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
 *.ipa
+*.xcuserstate
+**/.xcode.env.local
+
+# Android / IntelliJ
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+.kotlin/
 *.aab
+
+# Ruby / CocoaPods
+**/Pods/
+/vendor/bundle/
+
+# JS build output
+*.jsbundle
+*.tsbuildinfo
+/coverage
+.metro-health-check*
+
+# fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
 
 # vendor app reverse-engineering artefacts — do not commit third-party app code
 *.apk
@@ -29,6 +68,7 @@ smartled-src/
 *.mobileprovision
 *.jks
 *.keystore
+!debug.keystore
 
 # macOS
 .DS_Store

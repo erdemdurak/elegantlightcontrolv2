@@ -1,4 +1,3 @@
-import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
 import ColorPicker from "react-native-wheel-color-picker";
@@ -8,6 +7,7 @@ import {
   Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -34,7 +34,7 @@ import { hexToHsv, hsvToHex } from "./src/utils/color";
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "a5-v8 · SmartLed A5 protocol · FFB0/FFB1";
+const BUILD_LABEL = "v2-bare-rn · a5-v8 · SmartLed A5 · FFB0/FFB1";
 
 const presetColors = [
   "#FF0000",
@@ -441,7 +441,7 @@ export default function App() {
           }
         }
 
-        await new Promise((resolve) => setTimeout(resolve, interval));
+        await new Promise<void>((resolve) => setTimeout(() => resolve(),interval));
       }
     };
 
@@ -590,7 +590,7 @@ export default function App() {
         if (autoCancelRef.current) {
           break;
         }
-        await new Promise((resolve) => setTimeout(resolve, 900));
+        await new Promise<void>((resolve) => setTimeout(() => resolve(),900));
         index += 1;
       }
 
@@ -771,9 +771,9 @@ export default function App() {
     void (async () => {
       // Always lead with the handshake and power-on the vendor app sends.
       await sendCommandText({ hex: "a5ff010005000000ff64000005ff01ff01010000" }, "A5 power on");
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise<void>((resolve) => setTimeout(() => resolve(),400));
       await sendCommandText({ hex: "a5ff010005ff0000000064000005ff01ff01010000" }, "A5 red");
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise<void>((resolve) => setTimeout(() => resolve(),400));
 
       let index = 2;
       while (!labCancelRef.current && index < vendorCommands.length) {
@@ -781,7 +781,7 @@ export default function App() {
         if (labCancelRef.current) {
           break;
         }
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise<void>((resolve) => setTimeout(() => resolve(),1500));
         index += 1;
       }
 
@@ -843,7 +843,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.heroCard}>
           <Text style={styles.heroTitle}>{device ? "Connected" : "Not Connected"}</Text>

@@ -133,19 +133,47 @@ everything. The generic `FFB0` service is the real one.
 
 ---
 
-## 4. Commands
+## 4. Commands — bare React Native (no Expo)
+
+**This is v2. Expo and EAS have been removed.** There is no managed workflow, no cloud build,
+and no build quota. `ios/` and `android/` are tracked source, edited directly.
 
 ```bash
-npx tsc --noEmit                      # typecheck — must be clean
-npx expo export --platform ios        # verify the JS bundle builds
-npm run build:ios                     # eas build --platform ios --profile preview
+npm run typecheck                     # tsc --noEmit — must be clean
+npx react-native bundle --entry-file index.js --platform ios \
+  --dev false --bundle-output /tmp/main.jsbundle   # verify the JS bundle builds
+npm run pods                          # cd ios && bundle exec pod install
+npm run ios:device                    # build + install on a tethered iPhone
 ```
 
-Use the **`preview`** profile, not `development`. A dev-client build needs a reachable Metro
-bundler, which is useless in a car. `preview` is standalone.
+Everything now builds **locally**, which means the toolchain is a hard prerequisite:
 
-Builds install from their EAS build page opened in Safari **on the iPhone**. Credentials are
-already provisioned (ad-hoc, device UDID registered).
+| Requirement | Why |
+| --- | --- |
+| **Xcode** (full app, not Command Line Tools) | `xcodebuild` does not exist without it |
+| **Ruby ≥ 3.1** and **CocoaPods ≥ 1.15** | RN 0.81 pods; the system Ruby 2.6 is too old |
+| iPhone tethered by cable | No EAS install page any more — Xcode installs directly |
+
+Run `bundle install` once in `ios/` to get the pinned CocoaPods from the `Gemfile`, then
+`npm run pods`. Open `ios/ElegantLightControl.xcodeproj` in Xcode for signing.
+
+The bundle identifier is deliberately **`com.ambientlightcontroller.mobile`**, the same as v1,
+so the existing ad-hoc provisioning profile and registered device UDID keep working. It also
+means v2 replaces v1 on the phone rather than sitting beside it.
+
+Android is scaffolded but **not configured** — the BLE permissions from v1's `app.json` have
+not been transferred to `AndroidManifest.xml` yet. Do that when Android is actually wanted.
+
+### What replaced what
+
+| Expo (v1) | Bare RN (v2) |
+| --- | --- |
+| `registerRootComponent` from `expo` in `index.ts` | `AppRegistry.registerComponent` in `index.js` |
+| `expo-status-bar` | `StatusBar` from `react-native` |
+| `react-native-ble-plx` config plugin | `NSBluetooth*UsageDescription` keys in `Info.plist` |
+| `app.json` Expo config block | `app.json` (name/displayName) + native project files |
+| `eas.json` build profiles | Xcode schemes and configurations |
+| `expo export` | `react-native bundle` |
 
 ---
 
