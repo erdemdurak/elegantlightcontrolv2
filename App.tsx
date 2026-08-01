@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v43 · gradient fix";
+const BUILD_LABEL = "v2 · lenze-v44 · background toggle";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -315,6 +315,7 @@ export default function App() {
   const [activeTarget, setActiveTarget] = useState<ControlTarget>("both");
   const [activeThemeId, setActiveThemeId] = useState<string | null>(null);
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
+  const [backgroundEffects, setBackgroundEffects] = useState(true);
   const [autoDayNight, setAutoDayNight] = useState(false);
   const [dayProfile, setDayProfile] = useState<DayNightProfile>(defaultDayProfile);
   const [nightProfile, setNightProfile] = useState<DayNightProfile>(defaultNightProfile);
@@ -401,6 +402,10 @@ export default function App() {
             setLastDeviceId(parsed.lastDeviceId);
           }
 
+          if (typeof parsed.backgroundEffects === "boolean") {
+            setBackgroundEffects(parsed.backgroundEffects);
+          }
+
           if (typeof parsed.autoDayNight === "boolean") {
             setAutoDayNight(parsed.autoDayNight);
           }
@@ -441,6 +446,7 @@ export default function App() {
         savedPalette,
         lockedProfile,
         lastDeviceId,
+        backgroundEffects,
         autoDayNight,
         dayProfile,
         nightProfile,
@@ -455,6 +461,7 @@ export default function App() {
     savedPalette,
     lockedProfile,
     lastDeviceId,
+    backgroundEffects,
     autoDayNight,
     dayProfile,
     nightProfile,
@@ -870,7 +877,7 @@ export default function App() {
   // Hold the audio session only while the phone is actually computing frames. The app never
   // sleeping costs real battery, so a static colour or a chip-side breathe must not pay it.
   const needsKeepAlive =
-    Boolean(device) && (isPhoneDrivenMode(area1) || isPhoneDrivenMode(area2));
+    backgroundEffects && Boolean(device) && (isPhoneDrivenMode(area1) || isPhoneDrivenMode(area2));
 
   useEffect(() => {
     if (!needsKeepAlive) {
@@ -1982,6 +1989,22 @@ export default function App() {
             Breathe and auto run on the controller and keep going with the app closed — breathe
             keeps your colour, auto uses the chip's own palette. Gradient and strobe are
             computed on the phone, so they use your colours but need the app running.
+          </Text>
+          <View style={styles.row}>
+            <Pressable
+              style={[styles.modeButton, backgroundEffects ? styles.modeActive : null]}
+              onPress={() => setBackgroundEffects((prev) => !prev)}
+            >
+              <Text style={styles.modeText}>
+                {backgroundEffects ? "✓ Gradient in background" : "Gradient in background"}
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={styles.helperText}>
+            Keeps gradient and strobe alive with the app closed, by holding a silent audio
+            session — the only power-hungry thing here, and only while one of those two is
+            running. Holding the Bluetooth link costs almost nothing, and breathe and auto are
+            unaffected either way. Turn it off if you are not plugged in.
           </Text>
           <View style={styles.row}>
             {modeOptions.map((mode) => (

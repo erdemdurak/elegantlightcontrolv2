@@ -54,6 +54,11 @@ export type AppStateSnapshot = {
    * to perform a write, and a command that arrives to a disconnected app does nothing.
    */
   lastDeviceId?: string | null;
+  /**
+   * Whether phone-driven effects may hold the audio session to survive backgrounding. Off
+   * costs nothing; on is the only expensive thing this app does.
+   */
+  backgroundEffects?: boolean;
   /** Apply a profile automatically on connect, chosen by the clock. */
   autoDayNight?: boolean;
   dayProfile?: DayNightProfile;
