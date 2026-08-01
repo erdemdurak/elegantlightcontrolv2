@@ -43,15 +43,15 @@ export const BUILT_IN_THEMES: Theme[] = [
   {
     id: "amg",
     name: "AMG",
-    area1: { hex: "#8E0000", brightness: 55 },
-    area2: { hex: "#FF0000", brightness: 90 },
-    hint: "Deep red lines, bright red vents",
+    area1: { hex: "#FFC400", brightness: 70 },
+    area2: { hex: "#00BBFF", brightness: 85 },
+    hint: "Amber doors, cyan vents — the AMG cluster's own yellow and blue",
   },
   {
     id: "night-drive",
     name: "Night Drive",
-    area1: { hex: "#0033FF", brightness: 60 },
-    area2: { hex: "#0066FF", brightness: 80 },
+    area1: { hex: "#000FFF", brightness: 60 },
+    area2: { hex: "#1500FF", brightness: 80 },
     hint: "The signature Mercedes blue, deepest on the doors",
   },
   {
@@ -85,9 +85,9 @@ export const BUILT_IN_THEMES: Theme[] = [
   {
     id: "emerald",
     name: "Emerald",
-    area1: { hex: "#00A86B", brightness: 55 },
-    area2: { hex: "#00E6A0", brightness: 80 },
-    hint: "Jade doors, mint vents — green kept blue-side, where it stops fighting the amber dash",
+    area1: { hex: "#00FF56", brightness: 90 },
+    area2: { hex: "#00E6A0", brightness: 75 },
+    hint: "Bright green doors, mint vents — the doors carry this one, unusually",
   },
   {
     id: "nightshade",
@@ -118,6 +118,35 @@ export const BUILT_IN_THEMES: Theme[] = [
     hint: "Plain white, held low so the leather keeps its grain",
   },
 ];
+
+export const DEFAULT_DAY_THEME_ID = "burmester";
+export const DEFAULT_NIGHT_THEME_ID = "night-drive";
+
+/** Night starts at this hour, and day at DAY_START_HOUR. Local clock, 24h. */
+const NIGHT_START_HOUR = 19;
+const DAY_START_HOUR = 7;
+
+/**
+ * Whether the cabin should be on its night preset.
+ *
+ * Deliberately the clock rather than actual sunrise/sunset: real sun times need the user's
+ * location, and this app asks for no location permission at all. A fixed boundary is wrong by
+ * an hour or so at the solstices, which for choosing between amber and blue is close enough.
+ */
+export function isNightAt(date: Date): boolean {
+  const hour = date.getHours();
+  return hour >= NIGHT_START_HOUR || hour < DAY_START_HOUR;
+}
+
+/** Both halves of a theme as a stored day/night profile. Used for defaults and migration. */
+export function themeToProfile(id: string): { area1: LightSettings; area2: LightSettings } | null {
+  const theme = BUILT_IN_THEMES.find((entry) => entry.id === id);
+  if (!theme) {
+    return null;
+  }
+
+  return { area1: themeToSettings(theme, "area1"), area2: themeToSettings(theme, "area2") };
+}
 
 /**
  * Expands one half of a theme into full settings. The pair's two colours are also seeded as

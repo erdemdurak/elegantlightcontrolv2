@@ -25,41 +25,86 @@ the second Direction value.
 
 ---
 
-## Next trip
+## Testing `lenze-v42`
 
-Take the **MacBook and the USB cable** for Part B. Part A needs neither.
+Three stages. The first needs no car at all, so do it at the desk and only take working
+software down to the garage.
 
-### Part A — check the v25 fixes (~5 min, phone only)
+### Stage 1 — at the desk (~10 min)
 
-Build stamp must read `v2 · lenze-v25 · vibrant wheel · static mode`. If it says anything
-else you are on the wrong build.
+Build stamp under the connection status must read `v2 · lenze-v42 · voice reference`.
 
-**A1 — the washed-colour fix.** This only tests anything if the controller starts out running
-an effect, so put it in one deliberately:
+**Connect once manually first.** The app was reinstalled, so its stored state is gone —
+it does not know the controller yet and auto-reconnect cannot fire until it does.
 
-1. Open the **vendor** app, start any **Magic** mode, watch it animate.
-2. **Force-quit the vendor app.**
-3. Open **ours**, connect.
-4. Tap a saturated preset swatch — pure red is the clearest.
+1. **Mode row** — Mono / Gradient / Strobe / Breathe / Auto should all fit without wrapping
+   awkwardly.
+2. **Palette** — 26 swatches, six per row, reading as a spectrum from red round to white. Tap
+   a few and check the colour on the strip matches the swatch. The two salmons are meant to
+   look paler than the rest; nothing else should.
+3. **Saved colours** — pick something off the wheel, **+ Save Current Colour**. It should
+   appear *below a thin horizontal line*, separate from the built-ins, and long-press should
+   delete it. The line only exists once you have saved something.
+4. **Swap** — the fourth pill beside Area 1 / Area 2 / Both. Set the two areas to obviously
+   different colours, tap it, and confirm they exchange.
+5. **Night Drive** preset — now `#000FFF` doors and `#1500FF` vents.
+6. **Voice Commands card** at the bottom — tap to expand and check the lists read correctly.
+2. **Day / Night section**, at the bottom:
+   - Set the cabin up in Light Control the way you want it for daytime, then **Save Current**
+     under *Day*. The two rows should update to that colour, brightness and mode.
+   - Change the cabin, then **Save Current** under *Night*.
+   - Press **Apply Now** on each and confirm the lights match what the rows show.
+   - Turn **Automatic on connect** on.
+3. **Siri**, phone unlocked, app force-quit each time:
+   - "Hey Siri, set Elegant Light to amber"
+   - "Hey Siri, Elegant Light AMG"
+   - "Hey Siri, set Elegant Light mode to breathe"
+   - "Hey Siri, turn off Elegant Light"
+4. **Shortcuts app** — open it and confirm *Set Light Brightness* and *Set Light Mode* now
+   appear alongside the three older actions. Brightness deliberately has no spoken phrase.
 
-| Result | Meaning |
-| --- | --- |
-| Clean, deep red | The static-mode frame fixed it. Done |
-| Still washed | Wrong theory — go to A3 |
+### Stage 2 — build the automation (~5 min, at the desk)
 
-**A2 — the wheel.** Drag to the **outer third** of the wheel: colours should now be fully
-vibrant well before the rim, instead of only at the very edge. Drag to the **middle**: should
-still be visibly pale. Report if either half feels wrong.
+Shortcuts → **Automation** → **+** → **CarPlay** → **When CarPlay Connects** → **Run
+Immediately** (not *Run After Confirmation*, or it will ask every single time).
 
-**A3 — only if A1 still looked washed.** Capture the vendor app setting a plain static colour
-so I can diff its frames against ours byte for byte:
+Add one action: **Open App → Elegant Light**. That is enough — with Automatic on connect
+switched on, the app picks Day or Night by itself once it sees the car.
 
-1. Fresh trace, vendor app only, our app force-quit
-2. Set **pure red**, both areas → wait 10 s
-3. Set **pure blue**, both areas → wait 10 s
-4. Save as `static-<date>.pklg`
+Only add explicit *Apply Light Preset* / *Set Light Brightness* actions if you want to
+override the automatic choice.
 
-### Part B — the mode list (~5 min, Mac + cable)
+### Stage 3 — in the car
+
+1. **Plug in.** Expect: app comes forward, connects on its own, and the correct profile for the
+   time of day applies. Note how long the whole chain takes.
+2. **Check the profile matched the clock** — night is 19:00-07:00.
+3. **Siri while driving**, hands-free through the car microphone: a colour, then a preset.
+4. **Chip modes survive backgrounding** — set Breathe, close the app, confirm it keeps
+   breathing your colour. Repeat with Auto, which should cycle the chip's own palette.
+5. **Phone-driven modes need the keepalive** — set Gradient, lock the phone, and check it keeps
+   cycling. This is the audio keepalive being exercised for the first time in the car.
+6. **Music test, the important one** — start music, then start a Gradient. If the music stops,
+   `.mixWithOthers` is not doing its job and I need to know.
+
+### What to write down
+
+- Whether the app foregrounding on CarPlay connect actually bothers you. That single answer
+  decides whether the native CoreBluetooth rewrite is worth doing.
+- Anything in stage 3 that did not happen.
+
+### Still uncaptured, if you have the Mac with you
+
+- **Mode selection list names** — the frames carry a number and I still cannot map numbers to
+  names. Screenshots of the list scrolled to top and bottom would settle it.
+- **The second Direction value** — both captures caught only `24 01`.
+
+---
+
+## Optional — finish the mode-list capture (Mac + cable, ~5 min)
+
+Only worth doing if you want the chip's own patterns named in the app. Everything else is
+decoded.
 
 **Screenshots first.** Scroll **Mode selection** to the very top, screenshot; to the very
 bottom, screenshot. Same for **Flow mode**. The frames carry numbers; these lists are the only
@@ -68,21 +113,17 @@ way to know which number is which name.
 Then:
 
 1. Plug in, `File ▸ New iOS Trace…`, confirm packets are scrolling
-2. **Force-quit our app** — it now sends a static-mode frame on connect, which would muddy
-   the trace
+2. **Force-quit our app** — it sends a static-mode frame on connect, which would muddy the trace
 3. In the vendor app, touch **nothing but the Mode selection picker**:
-   - **Magic-1** → wait 10 s
-   - **Magic-2** → wait 10 s
-   - **Magic-3** → wait 10 s
-4. Then **Direction**: **Reverse** → wait 10 s → **Posit** → wait 10 s
+   **Magic-1** → 10 s → **Magic-2** → 10 s → **Magic-3** → 10 s
+4. Then **Direction**: **Reverse** → 10 s → **Posit** → 10 s
 5. Save as `modes-<date>.pklg`
 
-Three *adjacent* entries is all it takes. If they come out as `0X`, `1X`, `2X` with the same
-low nibble, the whole mode list follows by index — exactly as Flow mode did — and nothing else
-needs capturing.
+Three *adjacent* entries is all it takes — if they come out `0X`, `1X`, `2X` with the same low
+nibble, the whole list follows by index, exactly as Flow mode did.
 
-Step 4 exists purely because the last trip ended one tap too early: only `24 01` was recorded,
-so one of Posit/Reverse is still unknown.
+Step 4 exists because both previous captures ended one tap too early: only `24 01` was ever
+recorded, so one of Posit/Reverse is still unknown.
 
 **Leave "Number of lamp" at 30.** It is the pixel count of the strip, not an effect setting.
 

@@ -179,28 +179,44 @@ not been transferred to `AndroidManifest.xml` yet. Do that when Android is actua
 
 ## Task backlog
 
-### Task 1 — Apple CarPlay support
+### Task 1 — Apple CarPlay support — **mostly done, 2026-08-01**
 
-A full CarPlay app is almost certainly unattainable: the entitlement is granted only for
-specific categories (audio, communication, navigation, EV charging, parking, fueling, quick
-food ordering, driving task, automaker). A vehicle lighting accessory fits none of them.
-**Siri via App Intents is the realistic path** — voice control works in CarPlay with no
-entitlement. See `docs/carplay-plan.md` for the original analysis.
+**A full CarPlay app is not attainable.** The entitlement is granted only for fixed categories
+(audio, communication, navigation, EV charging, parking, fueling, quick food ordering, driving
+task, automaker) and a lighting accessory fits none. It is not a code limitation that can be
+worked around: the entitlement must be in the **provisioning profile**, which Apple's servers
+generate from capabilities enabled on the App ID, and iOS validates it. Not publishing does not
+help — Apple's criteria expect a distributed app. Adding
+`com.apple.developer.carplay-maps` to the entitlements file by hand works **in the Xcode
+simulator only** and never reaches real head-unit hardware.
 
-Blocked on protocol identification. Do not start before control works.
+**Siri via App Intents is the route, and it works.** Confirmed in the car 2026-08-01.
 
-- [ ] **1a. Background BLE + auto-reconnect.** Set `isBackgroundEnabled: true` and the
-      `bluetooth-central` background mode in `app.json`; reconnect automatically on
-      disconnect and on app foreground. JS + config only, no prebuild. Worth doing on its
-      own merit — it fixes connection drops.
-- [ ] **1b. App Intents.** Requires `expo prebuild` (moves the project to CNG with native
-      iOS directories) plus Swift. Expose: set colour, set area, set brightness, apply
-      theme, on/off. Start with `openAppWhenRun = true` so the intent launches the app to
-      perform the BLE write — far simpler than 1c.
-- [ ] **1c. Native CoreBluetooth path** *(optional)*. Reimplement the writes in Swift so
-      intents run without launching the app. Duplicates protocol logic; only worth it if
-      1b's launch behaviour proves annoying.
-- [ ] **1d. Shortcuts automation** — "when CarPlay connects, apply <theme>".
+Two things Apple changed that the old plan missed:
+
+- **iOS 26 allows third-party widgets on the CarPlay Dashboard with no entitlement** — support
+  the `systemSmall` family and they appear "even if you don't have a CarPlay app". They are
+  **display-only**; interaction is disabled. This is the only way to get anything on the car
+  screen. Not built — the user does not want it.
+- The old note that 1b "requires `expo prebuild`" was written for v1. v2 is already bare RN
+  with a real Xcode project, so that step never applied here.
+
+- [x] **1a. Background BLE + auto-reconnect.** `bluetooth-central` and `audio` in
+      `Info.plist`; the app remembers the last controller and reconnects on launch, on
+      foreground, and when CarPlay is detected via the audio route.
+- [x] **1b. App Intents.** `AmbientIntents.swift` — colour (21 spoken names), preset (12),
+      mode, brightness, power. `openAppWhenRun = true`; handover is a JSON blob in
+      UserDefaults because Siri cold-launches the app. Note: **AppShortcut phrases accept only
+      one parameter**, so area cannot be spoken, and an `Int` cannot appear in a phrase at all,
+      which is why brightness is Shortcuts-only.
+- [ ] **1c. Native CoreBluetooth path** *(optional)*. Would let intents run without launching
+      the app, so automations fire with the phone locked in a pocket. Duplicates
+      `protocolFamilies.ts` in Swift. Deferred pending the answer to "does the app
+      foregrounding actually annoy you in practice".
+- [x] **1d. Shortcuts automation** — CarPlay-connect automation opens the app, which then
+      applies the day or night profile by itself.
+- [ ] **1e. Driving-task entitlement request** *(long shot)*. The only category an in-car
+      accessory could argue for. Free to submit at developer.apple.com/carplay; low odds.
 
 ### Task 2 — Gradient tests
 

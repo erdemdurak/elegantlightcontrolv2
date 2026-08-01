@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-ElegantLightControl.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-ElegantLightControl.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		385E56E02A0514A9022D40EC /* CarPlayStatus.m in Sources */ = {isa = PBXBuildFile; fileRef = F5FFB0ACC7B04735321DB5A8 /* CarPlayStatus.m */; };
 		4D19727D9F3407850EEB7373 /* AmbientIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4F09B938E9ABC3221A221F3 /* AmbientIntents.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -33,6 +34,7 @@
 		85931C298EE871847AC1A049 /* BackgroundKeepAlive.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = ElegantLightControl/BackgroundKeepAlive.m; sourceTree = "<group>"; };
 		E4F09B938E9ABC3221A221F3 /* AmbientIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AmbientIntents.swift; path = ElegantLightControl/AmbientIntents.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F5FFB0ACC7B04735321DB5A8 /* CarPlayStatus.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = CarPlayStatus.m; path = ElegantLightControl/CarPlayStatus.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +61,7 @@
 				85931C298EE871847AC1A049 /* BackgroundKeepAlive.m */,
 				E4F09B938E9ABC3221A221F3 /* AmbientIntents.swift */,
 				6570C446627BA6C1B3016723 /* SiriBridge.m */,
+				F5FFB0ACC7B04735321DB5A8 /* CarPlayStatus.m */,
 			);
 			name = ElegantLightControl;
 			sourceTree = "<group>";
@@ -263,6 +266,7 @@
 				AAE0C23FD31C4CFDFDD88817 /* BackgroundKeepAlive.m in Sources */,
 				4D19727D9F3407850EEB7373 /* AmbientIntents.swift in Sources */,
 				E51EDD90E94CB4B1AF16D981 /* SiriBridge.m in Sources */,
+				385E56E02A0514A9022D40EC /* CarPlayStatus.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

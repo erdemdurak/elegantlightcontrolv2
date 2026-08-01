@@ -7,8 +7,12 @@ import { NativeModules } from "react-native";
  * intent fires. The intent parks a JSON blob in UserDefaults and the app drains it once it is
  * running — on mount and every time it returns to the foreground.
  */
+export type SiriArea = "area1" | "area2" | "both";
+
 export type SiriCommand =
-  | { type: "color"; value: string; area: "area1" | "area2" | "both" }
+  | { type: "color"; value: string; area: SiriArea }
+  | { type: "brightness"; value: string; area: SiriArea }
+  | { type: "mode"; value: string; area: SiriArea }
   | { type: "preset"; value: string }
   | { type: "power"; value: "on" | "off" };
 

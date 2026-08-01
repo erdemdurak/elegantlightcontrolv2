@@ -35,6 +35,7 @@ import {
 import type {
   AmbientMode,
   AppStateSnapshot,
+  DayNightProfile,
   ControlTarget,
   LightSettings,
   LockedProfile,
@@ -44,12 +45,22 @@ import { startKeepAlive, stopKeepAlive } from "./src/ble/backgroundKeepAlive";
 import { consumeSiriCommand, type SiriCommand } from "./src/ble/siriCommands";
 import { hexToHsv, hsvToHex, vibrantSaturation } from "./src/utils/color";
 import { InteriorPreview } from "./src/components/InteriorPreview";
-import { BUILT_IN_THEMES, themeToSettings, type Theme } from "./src/themes";
+import {
+  BUILT_IN_THEMES,
+  DEFAULT_DAY_THEME_ID,
+  DEFAULT_NIGHT_THEME_ID,
+  isNightAt,
+  themeToProfile,
+  themeToSettings,
+  type Theme,
+} from "./src/themes";
+import { isCarPlayActive } from "./src/ble/carPlayStatus";
+import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPhrases";
 
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v33 · auto mode";
+const BUILD_LABEL = "v2 · lenze-v43 · gradient fix";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -58,38 +69,61 @@ const BUILD_LABEL = "v2 · lenze-v33 · auto mode";
 const SHOW_DEV_TOOLS: boolean = false;
 
 /**
- * Every hue here has one channel at 255 and one at 0, so HSV saturation is exactly 100%.
+ * Erdem's own palette, ordered around the wheel rather than as given so the grid reads as a
+ * spectrum: reds and warms, then greens, then blues and violets, ending on white.
  *
- * The previous set did not: #FFC31A was 89.8% saturated, #1EA5E9 only 87.1% at 91% value.
- * That third channel lights the third LED and physically dilutes the colour on the strip,
- * which is why the swatches came out visibly paler than the same hue picked off the wheel —
- * wheel picks snap to full saturation in the outer band. Yellow suffered worst of all.
+ * Most entries are fully saturated — one channel at 255, one at 0. The two salmons are the
+ * deliberate exceptions and will read paler on the strip, which is the intent, not the
+ * dilution bug that made the previous palette look washed.
  *
- * Keep new entries to `00` / `FF` / one free channel. The last two are the deliberate
- * exceptions: white, and the warm white the W205 uses as its own ambient tone.
+ * Two pairs given in the list were exact duplicates (orange 2 / orange 3, orange / red 2) and
+ * are stored once: the grid keys swatches by colour, so a repeat would collide.
  */
 const presetColors = [
   "#FF0000", // red
-  "#FF4000", // vermilion
-  "#FF8000", // orange
-  "#FFBF00", // amber
+  "#FF2100", // orange
+  "#FF5300", // orange 2
+  "#FF9100", // light orange
+  "#FFCB3D", // salmon
+  "#FFBB70", // salmon 2
+  "#FFF600", // yellow 2
   "#FFFF00", // yellow
-  "#80FF00", // lime
+  "#B4FF00", // light yellow
+  "#57FF00", // green-yellow
   "#00FF00", // green
-  "#00FF80", // spring
-  "#00FFFF", // cyan
-  "#0080FF", // azure
+  "#00FF0C", // light green
+  "#00FFA3", // teal
+  "#00B894", // deep teal
+  "#00FFF7", // teal 2
+  "#00FFED", // electric blue
+  "#00BBFF", // baby blue
+  "#005FFF", // light blue
+  "#0008FF", // violet 2
   "#0000FF", // blue
-  "#4000FF", // indigo
-  "#8000FF", // violet
-  "#BF00FF", // purple
-  "#FF00FF", // magenta
-  "#FF0080", // pink
+  "#1500FF", // blue 3
+  "#2000FF", // blue 2
+  "#3800FF", // violet
+  "#A400FF", // purple
+  "#FF00D3", // pink 2
+  "#FF009E", // pink
+  "#EB4393", // rose
   "#FFFFFF", // white
-  "#FFB870", // warm white — soft on purpose, the factory cabin tone
 ];
 
 const modeOptions: AmbientMode[] = ["monochrome", "gradient", "strobe", "breathe", "auto"];
+
+/**
+ * Button labels. "monochrome" is the stored value — renaming it would invalidate saved state
+ * and the Siri mode enum — but it is long enough to wrap the row onto two lines now that auto
+ * is there, so it displays as "Mono".
+ */
+const modeLabels: Record<AmbientMode, string> = {
+  monochrome: "Mono",
+  gradient: "Gradient",
+  strobe: "Strobe",
+  breathe: "Breathe",
+  auto: "Auto",
+};
 
 const speedLabels: Record<number, string> = {
   1: "Extra Slow",
@@ -157,6 +191,15 @@ const vendorCommands: Array<{ label: string; text?: string; hex?: string }> = [
   { label: "RED ch2", text: "[10ff0000]" },
   { label: "RED ch3", text: "[09ff0000]" },
 ];
+
+const defaultDayProfile: DayNightProfile = themeToProfile(DEFAULT_DAY_THEME_ID) ?? {
+  area1: defaultArea1,
+  area2: defaultArea2,
+};
+const defaultNightProfile: DayNightProfile = themeToProfile(DEFAULT_NIGHT_THEME_ID) ?? {
+  area1: defaultArea1,
+  area2: defaultArea2,
+};
 
 /** Modes the controller runs itself. Driving these from here would fight the chip. */
 const CHIP_MODES = new Set<AmbientMode>(["breathe", "auto"]);
@@ -272,6 +315,13 @@ export default function App() {
   const [activeTarget, setActiveTarget] = useState<ControlTarget>("both");
   const [activeThemeId, setActiveThemeId] = useState<string | null>(null);
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
+  const [autoDayNight, setAutoDayNight] = useState(false);
+  const [dayProfile, setDayProfile] = useState<DayNightProfile>(defaultDayProfile);
+  const [nightProfile, setNightProfile] = useState<DayNightProfile>(defaultNightProfile);
+  /** Bumped whenever CarPlay is seen active, to re-trigger the reconnect effect. */
+  const [carPlayTick, setCarPlayTick] = useState(0);
+  /** Guards the day/night preset so one connection cannot apply it twice. */
+  const dayNightAppliedRef = useRef(false);
   /** A Siri command that arrived before the controller was connected. */
   const pendingSiriRef = useRef<SiriCommand | null>(null);
   const [savedPalette, setSavedPalette] = useState<string[]>(defaultPalette);
@@ -288,6 +338,7 @@ export default function App() {
   const [gattEntries, setGattEntries] = useState<GattEntry[]>([]);
   const [notifyLog, setNotifyLog] = useState<string[]>([]);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
   const [hexInput, setHexInput] = useState("7E 00 05 03 FF 00 00 00 EF");
   const [hexTargetIndex, setHexTargetIndex] = useState(0);
   const [labCommandIndex, setLabCommandIndex] = useState(-1);
@@ -349,6 +400,23 @@ export default function App() {
           if (parsed.lastDeviceId) {
             setLastDeviceId(parsed.lastDeviceId);
           }
+
+          if (typeof parsed.autoDayNight === "boolean") {
+            setAutoDayNight(parsed.autoDayNight);
+          }
+
+          // Profiles superseded the preset ids. Older saves carry only an id, so build a
+          // profile from it once rather than silently resetting the user's choice.
+          const day = parsed.dayProfile ?? (parsed.dayThemeId ? themeToProfile(parsed.dayThemeId) : null);
+          if (day) {
+            setDayProfile({ area1: normalizeLight(day.area1), area2: normalizeLight(day.area2) });
+          }
+
+          const night =
+            parsed.nightProfile ?? (parsed.nightThemeId ? themeToProfile(parsed.nightThemeId) : null);
+          if (night) {
+            setNightProfile({ area1: normalizeLight(night.area1), area2: normalizeLight(night.area2) });
+          }
         }
       } catch {
         setStatusMessage("Could not load saved state. Using defaults.");
@@ -367,12 +435,31 @@ export default function App() {
     }
 
     const handle = setTimeout(() => {
-      const payload: AppStateSnapshot = { area1, area2, savedPalette, lockedProfile, lastDeviceId };
+      const payload: AppStateSnapshot = {
+        area1,
+        area2,
+        savedPalette,
+        lockedProfile,
+        lastDeviceId,
+        autoDayNight,
+        dayProfile,
+        nightProfile,
+      };
       void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     }, 400);
 
     return () => clearTimeout(handle);
-  }, [area1, area2, savedPalette, lockedProfile, lastDeviceId, hydrated]);
+  }, [
+    area1,
+    area2,
+    savedPalette,
+    lockedProfile,
+    lastDeviceId,
+    autoDayNight,
+    dayProfile,
+    nightProfile,
+    hydrated,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -405,24 +492,35 @@ export default function App() {
     [savedPalette],
   );
 
+  /**
+   * `withGradient` must be set only when the edit *is* to the gradient list.
+   *
+   * Targeting Both used to copy the whole settings object onto both areas, gradient stops
+   * included — so changing a colour or brightness while on Both silently replaced each area's
+   * saved gradient with the other's, and switching target then showed an empty list. Each area
+   * now keeps its own stops unless they are what changed.
+   */
   const applyToActive = useCallback(
-    (next: LightSettings) => {
+    (next: LightSettings, withGradient = false) => {
       // Every manual edit funnels through here, so this is the one place a theme stops
       // being the thing on screen.
       setActiveThemeId(null);
 
+      const keepStops = (prev: LightSettings): LightSettings =>
+        withGradient ? next : { ...next, gradientColors: prev.gradientColors };
+
       if (activeTarget === "both") {
-        setArea1(next);
-        setArea2(next);
+        setArea1(keepStops);
+        setArea2(keepStops);
         return;
       }
 
       if (activeTarget === "area1") {
-        setArea1(next);
+        setArea1(keepStops);
         return;
       }
 
-      setArea2(next);
+      setArea2(keepStops);
     },
     [activeTarget],
   );
@@ -519,7 +617,7 @@ export default function App() {
       return;
     }
 
-    applyToActive(normalizeLight({ ...activeSettings, gradientColors: [...existing, next] }));
+    applyToActive(normalizeLight({ ...activeSettings, gradientColors: [...existing, next] }), true);
     setStatusMessage(`Added ${next} to the gradient.`);
   };
 
@@ -529,6 +627,7 @@ export default function App() {
         ...activeSettings,
         gradientColors: activeSettings.gradientColors.filter((entry) => entry !== color),
       }),
+      true,
     );
   };
 
@@ -561,6 +660,50 @@ export default function App() {
         if (theme) {
           handleApplyTheme(theme);
         }
+        return;
+      }
+
+      if (command.type === "brightness") {
+        const level = clamp(Number(command.value), 0, 100);
+        const target = command.area;
+        const next1 = normalizeLight({ ...area1, brightness: level });
+        const next2 = normalizeLight({ ...area2, brightness: level });
+
+        if (target === "both") {
+          applyPair(next1, next2, `brightness ${level}%`);
+          return;
+        }
+
+        const next = target === "area1" ? next1 : next2;
+        if (target === "area1") {
+          setArea1(next);
+        } else {
+          setArea2(next);
+        }
+        void getBle().sendArea(target, next);
+        setStatusMessage(`Siri: brightness ${level}% on ${target}.`);
+        return;
+      }
+
+      if (command.type === "mode") {
+        const mode = command.value as LightSettings["mode"];
+        const target = command.area;
+        const next1 = normalizeLight({ ...area1, mode });
+        const next2 = normalizeLight({ ...area2, mode });
+
+        if (target === "both") {
+          applyPair(next1, next2, mode);
+          return;
+        }
+
+        const next = target === "area1" ? next1 : next2;
+        if (target === "area1") {
+          setArea1(next);
+        } else {
+          setArea2(next);
+        }
+        void getBle().sendArea(target, next);
+        setStatusMessage(`Siri: ${mode} on ${target}.`);
         return;
       }
 
@@ -653,7 +796,7 @@ export default function App() {
       ble.stopScan();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, device, lastDeviceId]);
+  }, [hydrated, device, lastDeviceId, carPlayTick]);
 
   // Replay a command that arrived while disconnected.
   useEffect(() => {
@@ -665,6 +808,64 @@ export default function App() {
     pendingSiriRef.current = null;
     runSiriCommand(queued);
   }, [device, runSiriCommand]);
+
+  /**
+   * Apply the clock-appropriate preset once per connection, but only when actually in the
+   * car — otherwise connecting at a desk would silently overwrite whatever was set.
+   */
+  useEffect(() => {
+    if (!device || !autoDayNight || dayNightAppliedRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void isCarPlayActive().then((inCar) => {
+      if (cancelled || !inCar || dayNightAppliedRef.current) {
+        return;
+      }
+
+      const night = isNightAt(new Date());
+      const profile = night ? nightProfile : dayProfile;
+
+      dayNightAppliedRef.current = true;
+      setActiveThemeId(null);
+      applyPair(normalizeLight(profile.area1), normalizeLight(profile.area2), night ? "Night" : "Day");
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [device, autoDayNight, dayProfile, nightProfile]);
+
+  // Arm it again for the next connection.
+  useEffect(() => {
+    if (!device) {
+      dayNightAppliedRef.current = false;
+    }
+  }, [device]);
+
+  // Plugging into the car is the strongest hint that a connection is wanted. Re-checked on
+  // every foreground, which is also when a Shortcuts automation will have brought us forward.
+  useEffect(() => {
+    const check = () => {
+      void isCarPlayActive().then((inCar) => {
+        if (inCar) {
+          setCarPlayTick((value) => value + 1);
+        }
+      });
+    };
+
+    check();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        check();
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   // Hold the audio session only while the phone is actually computing frames. The app never
   // sleeping costs real battery, so a static colour or a chip-side breathe must not pay it.
@@ -1179,6 +1380,56 @@ export default function App() {
   const currentStep = sweepIndex >= 0 ? sweepPlan[sweepIndex] : null;
   const currentZoneStep = zoneIndex >= 0 ? zonePlan[zoneIndex] : null;
 
+  const renderDayNight = (
+    label: string,
+    profile: DayNightProfile,
+    save: (next: DayNightProfile) => void,
+  ) => (
+    <View style={styles.stepCard}>
+      <Text style={styles.stepCounter}>{label}</Text>
+
+      {(["area1", "area2"] as const).map((key) => {
+        const settings = profile[key];
+        const hex = hsvToHex(settings.hue, settings.saturation, settings.value ?? 100);
+
+        return (
+          <View key={key} style={styles.areaCard}>
+            <View style={[styles.areaSwatch, { backgroundColor: hex }]} />
+            <View style={styles.areaTextWrap}>
+              <Text style={styles.areaLabel}>
+                {key === "area1" ? "Area 1 · doors" : "Area 2 · vents"}
+              </Text>
+              <Text style={styles.areaValue}>
+                {normalizeHex(hex)} · {Math.round(settings.brightness)}% · {settings.mode}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+
+      <View style={styles.row}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => {
+            save({ area1, area2 });
+            setStatusMessage(`${label} saved from the current cabin.`);
+          }}
+        >
+          <Text style={styles.actionText}>Save Current</Text>
+        </Pressable>
+        <Pressable
+          style={styles.actionButtonSecondary}
+          onPress={() => {
+            setActiveThemeId(null);
+            applyPair(normalizeLight(profile.area1), normalizeLight(profile.area2), label);
+          }}
+        >
+          <Text style={styles.actionText}>Apply Now</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   const renderSwatch = (color: string, deletable = false) => {
     const isSelected = normalizeHex(color) === normalizeHex(currentColor);
 
@@ -1569,6 +1820,7 @@ export default function App() {
               <Text style={styles.actionText}>⇄ Swap Areas</Text>
             </Pressable>
           </View>
+
           <Text style={styles.helperText}>
             {BUILT_IN_THEMES.find((theme) => theme.id === activeThemeId)?.hint ??
               "Each preset sets both areas at once. Left half of the chip is the door lines, right half the vents."}
@@ -1595,6 +1847,9 @@ export default function App() {
                 </Text>
               </Pressable>
             ))}
+            <Pressable style={styles.zoneButton} onPress={handleSwapAreas}>
+              <Text style={styles.zoneButtonText}>⇄ Swap</Text>
+            </Pressable>
           </View>
 
           {!canAddressAreas ? (
@@ -1692,17 +1947,23 @@ export default function App() {
 
           {/* Built-ins first and read-only, then yours. Long-press deletes, which is why the
               two groups have to stay distinguishable even though they share a grid. */}
-          <View style={styles.grid}>
-            {presetColors.map((color) => renderSwatch(color))}
-            {customPalette.map((color) => renderSwatch(color, true))}
-          </View>
+          <View style={styles.grid}>{presetColors.map((color) => renderSwatch(color))}</View>
+
+          {customPalette.length > 0 ? (
+            <>
+              <View style={styles.paletteDivider} />
+              <View style={styles.grid}>
+                {customPalette.map((color) => renderSwatch(color, true))}
+              </View>
+            </>
+          ) : null}
           <View style={styles.row}>
             <Pressable style={styles.actionButton} onPress={handleSavePaletteColor}>
               <Text style={styles.actionText}>+ Save Current Colour</Text>
             </Pressable>
           </View>
           <Text style={styles.helperText}>
-            The first {presetColors.length} are built in. Long-press one you saved to remove it.
+            Built-in colours above the line, yours below. Long-press one of yours to remove it.
           </Text>
 
           <Text style={styles.sliderLabel}>Brightness ({Math.round(activeSettings.brightness)}%)</Text>
@@ -1729,7 +1990,7 @@ export default function App() {
                 style={[styles.modeButton, activeSettings.mode === mode ? styles.modeActive : null]}
                 onPress={() => applyAndSend({ ...activeSettings, mode })}
               >
-                <Text style={styles.modeText}>{mode}</Text>
+                <Text style={styles.modeText}>{modeLabels[mode]}</Text>
               </Pressable>
             ))}
           </View>
@@ -1775,6 +2036,79 @@ export default function App() {
             }
           />
 
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>4. Day / Night</Text>
+          <Text style={styles.helperText}>
+            Each profile stores both areas in full — colour, brightness and mode. Set the cabin
+            up in Light Control, then Save Current here. Applied once when the app connects with
+            the phone plugged into the car, never at a desk. Night runs 19:00–07:00.
+          </Text>
+
+          <View style={styles.row}>
+            <Pressable
+              style={[styles.modeButton, autoDayNight ? styles.modeActive : null]}
+              onPress={() => setAutoDayNight((prev) => !prev)}
+            >
+              <Text style={styles.modeText}>
+                {autoDayNight ? "✓ Automatic on connect" : "Automatic on connect"}
+              </Text>
+            </Pressable>
+          </View>
+
+          {renderDayNight("Day", dayProfile, setDayProfile)}
+          {renderDayNight("Night", nightProfile, setNightProfile)}
+        </View>
+
+        <View style={styles.card}>
+          <Pressable onPress={() => setShowVoice((prev) => !prev)}>
+            <Text style={styles.sectionTitle}>5. Voice Commands {showVoice ? "▾" : "▸"}</Text>
+          </Pressable>
+
+          {showVoice ? (
+            <>
+              <Text style={styles.helperText}>
+                Say “Hey Siri” first. The app opens to perform the command, then applies it — a
+                second or two of delay is it reconnecting, not a fault.
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>Colour</Text>
+              <Text style={styles.monoLine}>Set {APP_SPOKEN_NAME} to «colour»</Text>
+              <Text style={styles.monoLine}>{APP_SPOKEN_NAME} «colour»</Text>
+              <Text style={styles.helperText}>{SIRI_COLOR_NAMES.join(" · ")}</Text>
+
+              <Text style={styles.sectionSubtitle}>Preset</Text>
+              <Text style={styles.monoLine}>Apply «preset» in {APP_SPOKEN_NAME}</Text>
+              <Text style={styles.monoLine}>{APP_SPOKEN_NAME} «preset»</Text>
+              <Text style={styles.helperText}>
+                {BUILT_IN_THEMES.map((theme) => theme.name).join(" · ")}
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>Mode</Text>
+              <Text style={styles.monoLine}>Set {APP_SPOKEN_NAME} mode to «mode»</Text>
+              <Text style={styles.helperText}>
+                {modeOptions.map((mode) => SIRI_MODE_NAMES[mode] ?? mode).join(" · ")}
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>Power</Text>
+              <Text style={styles.monoLine}>Turn on {APP_SPOKEN_NAME}</Text>
+              <Text style={styles.monoLine}>Turn off {APP_SPOKEN_NAME}</Text>
+
+              <Text style={styles.sectionSubtitle}>Brightness</Text>
+              <Text style={styles.helperText}>
+                No spoken phrase — a number cannot appear in a Siri shortcut phrase. Use the
+                Shortcuts app action “Set Light Brightness”, which is also where the
+                CarPlay-connect automation lives.
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>If Siri does not respond</Text>
+              <Text style={styles.helperText}>
+                Check Settings → Siri → Language is English. The phrases are built as English
+                text, so another language will not match however clearly you say them.
+              </Text>
+            </>
+          ) : null}
         </View>
 
         {SHOW_DEV_TOOLS ? (
@@ -2129,6 +2463,12 @@ const styles = StyleSheet.create({
   swatchActive: {
     borderColor: "#FFFFFF",
     borderWidth: 3,
+  },
+  paletteDivider: {
+    height: 1,
+    backgroundColor: "#39456B",
+    marginTop: 2,
+    marginBottom: 2,
   },
   themeChip: {
     width: "31%",

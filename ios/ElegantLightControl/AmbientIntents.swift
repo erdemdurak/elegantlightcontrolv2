@@ -56,46 +56,69 @@ enum LightAreaOption: String, AppEnum {
   }
 }
 
-/// Hexes kept in step with `presetColors` in App.tsx — every one fully saturated.
+/**
+ Spoken colours, drawn from `presetColors` in App.tsx.
+
+ Not all 26 swatches are here. The palette holds several pairs that differ by a handful of
+ values — four near-identical blues, and two teals ten apart in one channel — and offering
+ Siri "blue two" against "blue three" would only make recognition worse without giving the
+ driver anything new. Each near-duplicate group is represented once, by its clearest name.
+ */
 @available(iOS 16.0, *)
 enum LightColorOption: String, AppEnum {
-  case red, orange, amber, yellow, lime, green, cyan, azure, blue, violet, magenta, pink
-  case white, warmWhite
+  case red, orange, deepOrange, lightOrange, salmon, warmWhite
+  case yellow, warmYellow, lime, yellowGreen, green
+  case teal, turquoise, babyBlue, lightBlue, blue
+  case violet, purple, pink, magenta, white
 
   static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Colour")
   static var caseDisplayRepresentations: [LightColorOption: DisplayRepresentation] = [
     .red: "red",
     .orange: "orange",
-    .amber: "amber",
+    .deepOrange: "deep orange",
+    .lightOrange: "light orange",
+    .salmon: "salmon",
+    .warmWhite: "warm white",
     .yellow: "yellow",
+    .warmYellow: "warm yellow",
     .lime: "lime",
+    .yellowGreen: "yellow green",
     .green: "green",
-    .cyan: "cyan",
-    .azure: "azure",
+    .teal: "teal",
+    .turquoise: "turquoise",
+    .babyBlue: "baby blue",
+    .lightBlue: "light blue",
     .blue: "blue",
     .violet: "violet",
-    .magenta: "magenta",
+    .purple: "purple",
     .pink: "pink",
+    .magenta: "magenta",
     .white: "white",
-    .warmWhite: "warm white",
   ]
 
   var hex: String {
     switch self {
     case .red: return "#FF0000"
-    case .orange: return "#FF8000"
-    case .amber: return "#FFBF00"
+    case .orange: return "#FF2100"
+    case .deepOrange: return "#FF5300"
+    case .lightOrange: return "#FF9100"
+    case .salmon: return "#FFCB3D"
+    case .warmWhite: return "#FFBB70"
     case .yellow: return "#FFFF00"
-    case .lime: return "#80FF00"
+    case .warmYellow: return "#FFF600"
+    case .lime: return "#B4FF00"
+    case .yellowGreen: return "#57FF00"
     case .green: return "#00FF00"
-    case .cyan: return "#00FFFF"
-    case .azure: return "#0080FF"
+    case .teal: return "#00FFA3"
+    case .turquoise: return "#00FFF7"
+    case .babyBlue: return "#00BBFF"
+    case .lightBlue: return "#005FFF"
     case .blue: return "#0000FF"
-    case .violet: return "#8000FF"
-    case .magenta: return "#FF00FF"
-    case .pink: return "#FF0080"
+    case .violet: return "#3800FF"
+    case .purple: return "#A400FF"
+    case .pink: return "#FF00D3"
+    case .magenta: return "#FF009E"
     case .white: return "#FFFFFF"
-    case .warmWhite: return "#FFB870"
     }
   }
 }
@@ -179,6 +202,67 @@ struct ApplyLightPresetIntent: AppIntent {
 }
 
 @available(iOS 16.0, *)
+enum LightModeOption: String, AppEnum {
+  case monochrome
+  case breathe
+  case auto
+  case gradient
+  case strobe
+
+  static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Mode")
+  static var caseDisplayRepresentations: [LightModeOption: DisplayRepresentation] = [
+    .monochrome: "solid colour",
+    .breathe: "breathe",
+    .auto: "auto",
+    .gradient: "gradient",
+    .strobe: "strobe",
+  ]
+}
+
+@available(iOS 16.0, *)
+struct SetLightBrightnessIntent: AppIntent {
+  static var title: LocalizedStringResource = "Set Light Brightness"
+  static var description = IntentDescription("Sets ambient lighting brightness, 0 to 100.")
+  static var openAppWhenRun: Bool = true
+
+  // No spoken phrase for this one: AppShortcut phrases only accept AppEnum parameters, and
+  // an Int cannot appear in one. It is reachable from the Shortcuts app, which is where the
+  // CarPlay-connect automation lives anyway.
+  @Parameter(title: "Brightness", inclusiveRange: (0, 100))
+  var brightness: Int
+
+  @Parameter(title: "Area", default: .both)
+  var area: LightAreaOption
+
+  func perform() async throws -> some IntentResult {
+    PendingCommand.write([
+      "type": "brightness",
+      "value": String(brightness),
+      "area": area.target,
+    ])
+    return .result()
+  }
+}
+
+@available(iOS 16.0, *)
+struct SetLightModeIntent: AppIntent {
+  static var title: LocalizedStringResource = "Set Light Mode"
+  static var description = IntentDescription("Chooses solid colour, breathe, auto, gradient or strobe.")
+  static var openAppWhenRun: Bool = true
+
+  @Parameter(title: "Mode")
+  var mode: LightModeOption
+
+  @Parameter(title: "Area", default: .both)
+  var area: LightAreaOption
+
+  func perform() async throws -> some IntentResult {
+    PendingCommand.write(["type": "mode", "value": mode.rawValue, "area": area.target])
+    return .result()
+  }
+}
+
+@available(iOS 16.0, *)
 struct SetLightPowerIntent: AppIntent {
   static var title: LocalizedStringResource = "Turn Lights On or Off"
   static var openAppWhenRun: Bool = true
@@ -215,6 +299,12 @@ struct AmbientShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Apply Preset",
       systemImageName: "square.grid.2x2"
+    )
+    AppShortcut(
+      intent: SetLightModeIntent(),
+      phrases: ["Set \(.applicationName) mode to \(\.$mode)"],
+      shortTitle: "Set Mode",
+      systemImageName: "waveform"
     )
     AppShortcut(
       intent: SetLightPowerIntent(),

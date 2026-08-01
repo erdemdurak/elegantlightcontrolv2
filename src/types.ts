@@ -54,4 +54,21 @@ export type AppStateSnapshot = {
    * to perform a write, and a command that arrives to a disconnected app does nothing.
    */
   lastDeviceId?: string | null;
+  /** Apply a profile automatically on connect, chosen by the clock. */
+  autoDayNight?: boolean;
+  dayProfile?: DayNightProfile;
+  nightProfile?: DayNightProfile;
+  /** Superseded by dayProfile/nightProfile; still read once so older saves migrate. */
+  dayThemeId?: string;
+  nightThemeId?: string;
+};
+
+/**
+ * A full cabin state — both areas, each with its own colour, brightness and mode. Stored
+ * rather than a preset id so day and night can be tuned freely instead of being limited to
+ * the twelve built-ins.
+ */
+export type DayNightProfile = {
+  area1: LightSettings;
+  area2: LightSettings;
 };
