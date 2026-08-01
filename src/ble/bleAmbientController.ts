@@ -6,11 +6,14 @@ import type { ControlTarget, LightSettings, LockedProfile } from "../types";
 import { decodeControllerStatePayload, type ParsedControllerState } from "./ambientControllerProtocol";
 import {
   getProtocolFamily,
+  seedLenzeAreas,
+  seedLenzeBrightness,
   getZoneVariant,
   protocolFamilies,
   sweepColors,
   zoneTestColors,
   type Area,
+  type HardwareMode,
   type Payload,
   type ProtocolFamily,
   type ProtocolFamilyId,
@@ -23,6 +26,17 @@ const WRITE_GAP_MS = 40;
 
 /** Dwell between the RED / GREEN / BLUE pulses of one sweep step. */
 const SWEEP_COLOR_DWELL_MS = 700;
+
+/**
+ * The proprietary vendor service. It accepts writes and ignores them, and `5833FF03` floods
+ * a constant 0x69 heartbeat the vendor app never subscribes to. Subscribing to it buries the
+ * one notification that matters, so it is excluded from `startNotifications`.
+ */
+const DECOY_SERVICE_PREFIX = "5833ff01";
+
+/** The real control channel, confirmed by the 2026-07-31 capture of the vendor app. */
+const CONTROL_SERVICE_PREFIX = "0000ffb0";
+const CONTROL_WRITE_PREFIX = "0000ffb1";
 
 export type GattEntry = {
   serviceUuid: string;
@@ -326,12 +340,56 @@ export class BleAmbientController {
     }
 
     this.gattTable = entries;
+    this.autoLockKnownProfile();
   }
 
   /**
-   * Subscribes to every notifiable characteristic. A number of controllers refuse to act on
-   * writes until the central has subscribed, and any reply gives us ground truth that a
-   * command was understood.
+   * The protocol was captured from the vendor app, not guessed, so there is nothing left to
+   * sweep: if this controller exposes FFB0/FFB1 we already know exactly what to send and
+   * where. Locking it in automatically means area targeting works on first connect instead
+   * of silently falling back to a broadcast that lights both zones the same.
+   *
+   * This also replaces any profile persisted by an older build. Those were guesses from the
+   * pre-capture era (SmartLed A5 and friends) and are known wrong, so keeping one would
+   * leave the app sending frames this hardware ignores.
+   */
+  private autoLockKnownProfile(): void {
+    // Already on the captured profile — nothing to do.
+    if (this.lockedProfile?.familyId === "lenze-55") {
+      return;
+    }
+
+    const write = this.gattTable.find(
+      (entry) =>
+        entry.serviceUuid.toLowerCase().startsWith(CONTROL_SERVICE_PREFIX) &&
+        entry.characteristicUuid.toLowerCase().startsWith(CONTROL_WRITE_PREFIX) &&
+        (entry.writableWithoutResponse || entry.writableWithResponse),
+    );
+
+    if (!write) {
+      return;
+    }
+
+    const family = getProtocolFamily("lenze-55");
+    const variant = getZoneVariant(family.id, family.defaultZoneVariantId);
+
+    this.lockedProfile = {
+      familyId: family.id,
+      familyLabel: family.label,
+      serviceUuid: write.serviceUuid,
+      characteristicUuid: write.characteristicUuid,
+      zoneVariantId: variant?.id ?? null,
+      zoneVariantLabel: variant?.label ?? null,
+    };
+  }
+
+  /**
+   * Subscribes to the notifiable characteristics worth listening to. A number of controllers
+   * refuse to act on writes until the central has subscribed, and any reply gives us ground
+   * truth that a command was understood.
+   *
+   * The decoy `5833FF01` service is skipped: its 0x69 heartbeat is constant, the vendor app
+   * never subscribes to it, and its traffic drowns the FFB2 reply we actually need to see.
    */
   async startNotifications(onEvent: (event: NotificationEvent) => void): Promise<number> {
     if (!this.connectedDevice) {
@@ -340,7 +398,14 @@ export class BleAmbientController {
 
     this.clearNotifications();
 
-    const notifiable = this.gattTable.filter((entry) => entry.notifiable);
+    const allNotifiable = this.gattTable.filter((entry) => entry.notifiable);
+    const useful = allNotifiable.filter(
+      (entry) => !entry.serviceUuid.toLowerCase().startsWith(DECOY_SERVICE_PREFIX),
+    );
+
+    // If filtering leaves nothing (an unexpected GATT layout), fall back to everything
+    // rather than sitting deaf.
+    const notifiable = useful.length > 0 ? useful : allNotifiable;
 
     for (const entry of notifiable) {
       try {
@@ -562,6 +627,35 @@ export class BleAmbientController {
    * Sends one area's settings. When no zone encoding has been identified the command
    * is broadcast, which changes both strips together.
    */
+  /**
+   * Tell the protocol layer what each area is currently showing, without transmitting.
+   * Frames carry both areas, so the half not being edited comes from this memory.
+   */
+  seedAreaColors(area1: LightSettings, area2: LightSettings): void {
+    seedLenzeAreas(
+      hsvToRgb(area1.hue, area1.saturation, area1.value ?? 100),
+      hsvToRgb(area2.hue, area2.saturation, area2.value ?? 100),
+    );
+    // Brightness is its own both-areas-in-one frame, so it needs the same treatment.
+    seedLenzeBrightness(area1.brightness, area2.brightness);
+  }
+
+  /** Switch the strips off or on. Used by the Siri power intent. */
+  async setPower(on: boolean): Promise<void> {
+    if (!this.connectedDevice || !this.lockedProfile) {
+      throw new Error("No BLE device connected.");
+    }
+
+    const family = getProtocolFamily(this.lockedProfile.familyId);
+    const payloads = family.power ? family.power(on) : on ? family.powerOn() : [];
+
+    if (payloads.length === 0) {
+      throw new Error(`${family.label} has no power command.`);
+    }
+
+    await this.writePayloads(payloads, this.lockedTarget());
+  }
+
   async sendArea(target: ControlTarget, settings: LightSettings): Promise<void> {
     if (!this.connectedDevice) {
       throw new Error("No BLE device connected.");
@@ -569,7 +663,7 @@ export class BleAmbientController {
 
     // Brightness is sent as its own command, so the colour itself is always at full
     // value. Baking brightness into the RGB *and* sending it separately dims twice.
-    const rgb: Rgb = hsvToRgb(settings.hue, settings.saturation, 100);
+    const rgb: Rgb = hsvToRgb(settings.hue, settings.saturation, settings.value ?? 100);
 
     if (!this.lockedProfile) {
       await this.sendUnlocked(rgb, settings);
@@ -582,17 +676,38 @@ export class BleAmbientController {
 
     const areas: Area[] = target === "both" ? [1, 2] : [target === "area1" ? 1 : 2];
 
+    // `breathe` is run by the controller itself, on top of the static colour we just sent, so
+    // it keeps going once the app is closed. Every other mode is either static or computed on
+    // the phone, and both need the chip left in static — otherwise a breathe selected earlier
+    // carries on modulating underneath.
+    const hardwareMode: HardwareMode = settings.mode === "breathe" ? "breathe" : "static";
+
     if (!variant) {
       // No zone addressing known yet: broadcast once regardless of the selected area.
       await this.writePayloads(family.color(rgb), bleTarget);
       await this.writePayloads(family.brightness(settings.brightness), bleTarget);
+      await this.writeHardwareMode(family, hardwareMode, undefined, bleTarget);
       return;
     }
 
     for (const area of areas) {
       await this.writePayloads(variant.color(rgb, area), bleTarget);
       await this.writePayloads(variant.brightness(settings.brightness, area), bleTarget);
+      await this.writeHardwareMode(family, hardwareMode, area, bleTarget);
     }
+  }
+
+  private async writeHardwareMode(
+    family: ProtocolFamily,
+    mode: HardwareMode,
+    area: Area | undefined,
+    bleTarget: BleTarget,
+  ): Promise<void> {
+    if (!family.hardwareMode) {
+      return;
+    }
+
+    await this.writePayloads(family.hardwareMode(mode, area), bleTarget);
   }
 
   /**
@@ -702,8 +817,10 @@ export class BleAmbientController {
         candidate.characteristicUuid.toLowerCase() === target.characteristicUuid.toLowerCase(),
     );
 
-    // Transparent UART bridges are almost always write-without-response; using the
-    // advertised property avoids an error round-trip on every single write.
+    // Write WITHOUT response. The 2026-07-31 HCI capture of the vendor app shows every
+    // command frame going out as ATT WRITE_CMD (0x52) on FFB1 — not WRITE_REQ. An earlier
+    // build preferred with-response on the assumption the vendor app did; the capture
+    // disproved that.
     const preferWithoutResponse = entry ? entry.writableWithoutResponse : true;
 
     if (preferWithoutResponse) {

@@ -72,3 +72,8 @@ smartled-src/
 
 # macOS
 .DS_Store
+
+# iPhone diagnostic dumps. Multi-hundred-MB, over GitHub's file limit, and a full
+# personal device log — never commit these. Bluetooth traces live in captures/ instead.
+sysdiagnose_*/
+sysdiagnose_*.tar.gz

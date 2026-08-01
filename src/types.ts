@@ -26,6 +26,12 @@ export type LockedProfile = {
 export type LightSettings = {
   hue: number;
   saturation: number;
+  /**
+   * HSV value of the chosen colour, 0-100. Part of the colour itself: picking a dark shade
+   * from the wheel or grid must stay dark. `brightness` is the separate dimmer applied on
+   * top. Older saved states predate this field, so it defaults to 100.
+   */
+  value?: number;
   brightness: number;
   mode: AmbientMode;
   speed: GradientSpeed;
@@ -38,4 +44,9 @@ export type AppStateSnapshot = {
   area2: LightSettings;
   savedPalette: string[];
   lockedProfile?: LockedProfile | null;
+  /**
+   * Last controller connected to, so the app can reconnect on its own. Siri launches the app
+   * to perform a write, and a command that arrives to a disconnected app does nothing.
+   */
+  lastDeviceId?: string | null;
 };

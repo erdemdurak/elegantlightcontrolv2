@@ -118,3 +118,29 @@ export function hsvToHex(h: number, s: number, v: number): string {
 export function hexToHsv(hex: string): Hsv {
   return rgbToHsv(hexToRgb(hex));
 }
+
+/** Saturation at or above this fraction of the wheel radius is treated as fully saturated. */
+const RIM_BAND = 85;
+/** >1 bends the inner range downward, so the centre stays paler than a linear mapping. */
+const INNER_CURVE = 1.15;
+
+/**
+ * Reshape a saturation picked off the colour wheel.
+ *
+ * The wheel maps radius straight to saturation (`s = 100 * radius`), so 100% exists only on
+ * the outermost pixel of the circle. A fingertip cannot land there, which is why the vivid
+ * outer ring was unreachable and every pick came out looking washed next to the vendor app.
+ *
+ * This keeps the wheel reading exactly as it looks — pale in the middle, vivid at the edge —
+ * but puts "vivid" where a finger can actually reach: the outer band snaps to full, and
+ * below it the curve bends slightly downward so the centre is, if anything, paler than
+ * before. Only wheel picks go through this. Swatches are exact hex values and must not be
+ * touched, or #FF0000 would stop being #FF0000.
+ */
+export function vibrantSaturation(s: number): number {
+  if (s >= RIM_BAND) {
+    return 100;
+  }
+
+  return 100 * Math.pow(clamp(s, 0, RIM_BAND) / RIM_BAND, INNER_CURVE);
+}

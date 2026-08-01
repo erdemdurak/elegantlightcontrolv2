@@ -35,7 +35,38 @@ export type ProtocolFamily = {
   color(rgb: Rgb): Payload[];
   brightness(percent: number): Payload[];
   zoneVariants: ZoneVariant[];
+  /**
+   * Set when area addressing is already known and needs no sweeping. The controller uses
+   * this variant immediately instead of falling back to broadcast.
+   */
+  defaultZoneVariantId?: string;
+  /**
+   * Put an area into one of the controller's own animation modes. Optional — only firmware
+   * with chip-side effects implements it, and only `static` and `breathe` are used so far.
+   */
+  hardwareMode?(mode: HardwareMode, area?: Area): Payload[];
+  /** Switch the strips off and on. Optional — most families here only ever had `powerOn`. */
+  power?(on: boolean): Payload[];
 };
+
+/**
+ * Mode types the controller runs itself, from `55 03 03 A1 A2` — one byte per area.
+ * Captured 2026-07-31 by driving each mode from the vendor app in turn.
+ *
+ * `breathe` is the valuable one: it modulates the brightness of whatever static colour is
+ * already set rather than stepping through a palette of its own, so the colour still comes
+ * from us. Verified in the car — a colour set by our app kept breathing after our app was
+ * closed. The others replace the colour with the chip's own fixed palette.
+ */
+export const HARDWARE_MODES = {
+  static: 0x00,
+  gradient: 0x01,
+  breathe: 0x02,
+  strobe: 0x03,
+  automatic: 0x04,
+} as const;
+
+export type HardwareMode = keyof typeof HARDWARE_MODES;
 
 function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -687,12 +718,177 @@ const smartled: ProtocolFamily = {
   ),
 };
 
+/* -------------------------------------------------------------------------- */
+/* Lenze 55/AA frame — THE REAL PROTOCOL.                                      */
+/*                                                                             */
+/* Captured 2026-07-31 from the vendor iOS app "Ambient Light Control"          */
+/* (ShenZhen Lenze Technology) driving this exact controller, via PacketLogger  */
+/* HCI trace. Not inferred, not guessed — observed on the wire.                 */
+/*                                                                             */
+/*   55 | LEN | CMD | payload... | CKSUM | AA                                   */
+/*                                                                             */
+/*   LEN   = byte count of CMD + payload                                        */
+/*   CKSUM = ~(LEN + CMD + payload) & 0xFF   (one's complement)                 */
+/*                                                                             */
+/* Sent to FFB1 (handle 0x0014) as WRITE WITHOUT RESPONSE. Replies arrive on    */
+/* FFB2 (handle 0x0016) once its CCCD (0x0017) is written 0100.                 */
+/*                                                                             */
+/* Both areas travel in ONE frame — there is no area-selector byte, which is    */
+/* why every sweep over candidate bytes failed:                                 */
+/*                                                                             */
+/*   55 07 04 R1 G1 B1 R2 G2 B2 CK AA                                           */
+/*                                                                             */
+/* Observed frames, all checksum-verified:                                      */
+/*   550100feaa               query state  -> full state dump on FFB2           */
+/*   550101fdaa               query info                                        */
+/*   550704ff0102ff0102f0aa   red both areas                                    */
+/*   55070403fe1203fe12ceaa   green both areas                                  */
+/*   5507040101fd0101fdf6aa   blue both areas                                   */
+/*   550704ff01020101fdf3aa   area 1 red, area 2 blue                           */
+/*   55020500f8aa / 55020501f7aa   cmd 0x05, one byte — believed on/off         */
+/* -------------------------------------------------------------------------- */
+
+const LENZE_HEADER = 0x55;
+const LENZE_TAIL = 0xaa;
+
+function lenzeFrame(cmd: number, payload: number[]): number[] {
+  const body = [1 + payload.length, cmd, ...payload];
+  const checksum = ~sumChecksum(body) & 0xff;
+  return [LENZE_HEADER, ...body, checksum, LENZE_TAIL];
+}
+
 /**
- * Ordered so the highest-probability combinations come first: the documented 7E
- * protocol, then the other known families, then the 7E model-identifier variants,
- * then the debug profile.
+ * The colour command carries both areas at once, so setting one area requires remembering
+ * the other. Mirrors how the vendor app holds full state and re-sends it.
+ */
+const lenzeArea: Record<Area, Rgb> = {
+  1: { r: 255, g: 255, b: 255 },
+  2: { r: 255, g: 255, b: 255 },
+};
+
+/**
+ * Seed the remembered colours without sending anything.
+ *
+ * Every frame carries BOTH areas, so the half not being edited is filled from memory. On a
+ * cold start that memory defaulted to white, which meant the first single-area change after
+ * reopening the app visibly reset the other area. The UI knows the real colours, so it
+ * hands them over on launch and on connect.
+ */
+export function seedLenzeAreas(area1: Rgb, area2: Rgb): void {
+  lenzeArea[1] = area1;
+  lenzeArea[2] = area2;
+}
+
+function lenzeCurrentFrame(): number[] {
+  return lenzeFrame(0x04, [
+    clampByte(lenzeArea[1].r), clampByte(lenzeArea[1].g), clampByte(lenzeArea[1].b),
+    clampByte(lenzeArea[2].r), clampByte(lenzeArea[2].g), clampByte(lenzeArea[2].b),
+  ]);
+}
+
+function lenzeColorFrame(rgb: Rgb, area?: Area): number[] {
+  const areas: Area[] = area ? [area] : [1, 2];
+  for (const a of areas) {
+    lenzeArea[a] = rgb;
+  }
+  return lenzeCurrentFrame();
+}
+
+/**
+ * Brightness, like colour, carries both areas in one frame, so the half not being edited is
+ * filled from memory.
+ */
+const lenzeBrightness: Record<Area, number> = { 1: 100, 2: 100 };
+
+export function seedLenzeBrightness(area1: number, area2: number): void {
+  lenzeBrightness[1] = clampPercent(area1);
+  lenzeBrightness[2] = clampPercent(area2);
+}
+
+/**
+ * CAPTURED 2026-07-31 from the vendor app: `55 03 02 B1 B2 CK AA`, one byte per area, 0-100
+ * (0x00-0x64), dead linear with no gamma curve.
+ *
+ * This replaces the earlier stand-in that scaled the stored RGB on the phone. That worked,
+ * but it dimmed the colour rather than the light — and it meant colour and brightness could
+ * not be set independently, since every brightness move rewrote the colour frame.
+ */
+function lenzeBrightnessFrame(percent: number, area?: Area): number[] {
+  const areas: Area[] = area ? [area] : [1, 2];
+  for (const a of areas) {
+    lenzeBrightness[a] = clampPercent(percent);
+  }
+
+  return lenzeFrame(0x02, [
+    Math.round(lenzeBrightness[1]),
+    Math.round(lenzeBrightness[2]),
+  ]);
+}
+
+/** Like colour and brightness, the mode byte carries both areas in one frame. */
+const lenzeMode: Record<Area, number> = { 1: HARDWARE_MODES.static, 2: HARDWARE_MODES.static };
+
+function lenzeModeFrame(mode: HardwareMode, area?: Area): number[] {
+  const areas: Area[] = area ? [area] : [1, 2];
+  for (const a of areas) {
+    lenzeMode[a] = HARDWARE_MODES[mode];
+  }
+
+  return lenzeFrame(0x03, [lenzeMode[1], lenzeMode[2]]);
+}
+
+const lenze: ProtocolFamily = {
+  id: "lenze-55",
+  label: "Lenze 55/AA frame (captured)",
+  hint: "Captured from the vendor iOS app. Service FFB0 / char FFB1, write without response.",
+  serviceHints: ["ffb0"],
+  characteristicHints: ["ffb1"],
+  // The app opens by asking the controller for its current state, then forces both areas
+  // back to static colour. cmd 0x03 carries one byte per area and the vendor app sends
+  // `00 00` before setting a colour and `01 01` before starting an effect, so it reads as
+  // static-vs-dynamic. Without it, a controller left running a hardware effect by the vendor
+  // app blends over our colour writes, which is the likeliest cause of colours coming out
+  // washed next to the vendor app's.
+  preamble: () => [
+    { label: "query state", bytes: lenzeFrame(0x00, []) },
+    { label: "static mode both areas", bytes: lenzeModeFrame("static") },
+  ],
+  hardwareMode: (mode, area) => [
+    { label: `${mode} mode${area ? ` area ${area}` : ""}`, bytes: lenzeModeFrame(mode, area) },
+  ],
+  // 0x05 00 was captured and echoed back by the controller; 0x05 01 is the obvious pair.
+  powerOn: () => [{ label: "switch on", bytes: lenzeFrame(0x05, [0x01]) }],
+  power: (on) => [
+    { label: on ? "switch on" : "switch off", bytes: lenzeFrame(0x05, [on ? 0x01 : 0x00]) },
+  ],
+  color: (rgb) => [{ label: `colour ${rgbLabel(rgb)} both areas`, bytes: lenzeColorFrame(rgb) }],
+  brightness: (percent) => [
+    { label: `brightness ${clampPercent(percent)}%`, bytes: lenzeBrightnessFrame(percent) },
+  ],
+  // Area addressing is captured, not guessed, so it applies without an Area Sweep.
+  defaultZoneVariantId: "lenze-inline",
+  // Areas are positional within the one frame, so there is nothing to sweep.
+  zoneVariants: [
+    {
+      id: "lenze-inline",
+      label: "Both areas in one frame (captured)",
+      color: (rgb: Rgb, area: Area) => [
+        { label: `area ${area} colour ${rgbLabel(rgb)}`, bytes: lenzeColorFrame(rgb, area) },
+      ],
+      brightness: (percent: number, area: Area) => [
+        { label: `area ${area} brightness ${clampPercent(percent)}%`, bytes: lenzeBrightnessFrame(percent, area) },
+      ],
+    },
+  ],
+};
+
+/**
+ * Ordered so the highest-probability combinations come first: the captured Lenze
+ * protocol, then the older guessed families kept only for reference, then the
+ * debug profile.
  */
 export const protocolFamilies: ProtocolFamily[] = [
+  lenze,
   smartled,
   bracketAscii,
   makeBledom(0x00, true),
@@ -718,11 +914,15 @@ export function getProtocolFamily(id: string): ProtocolFamily {
 }
 
 export function getZoneVariant(familyId: string, variantId: string | null | undefined): ZoneVariant | null {
-  if (!variantId) {
+  const family = getProtocolFamily(familyId);
+  // Families whose area addressing was captured rather than guessed need no sweep, so an
+  // unset variantId still resolves.
+  const wanted = variantId ?? family.defaultZoneVariantId;
+  if (!wanted) {
     return null;
   }
 
-  return getProtocolFamily(familyId).zoneVariants.find((variant) => variant.id === variantId) ?? null;
+  return family.zoneVariants.find((variant) => variant.id === wanted) ?? null;
 }
 
 /** Vivid, unmistakable colours used by the identification sweep. */
