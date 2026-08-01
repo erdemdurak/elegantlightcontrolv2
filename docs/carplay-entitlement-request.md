@@ -1,6 +1,16 @@
 # CarPlay entitlement request — draft submission
 
-Submit at **developer.apple.com/carplay** → *Request CarPlay Entitlement*.
+**Form:** <https://developer.apple.com/contact/request/carplay/>
+
+`developer.apple.com/carplay` is only the marketing page. The link on it — *"Request CarPlay
+app entitlement"*, also shown at the bottom as *"Tell us about your CarPlay app"* — points at
+`/contact/carplay/`, which redirects to the address above.
+
+**Sign in to the Apple Developer account that owns team `Y829B2QFT9` first.** The form is
+behind Apple ID authentication and an unauthenticated visit bounces to a login page.
+
+The fields below are what the submission needs to cover; the live form is gated, so treat the
+exact labels as approximate and the content as ready to paste.
 
 Read the honest assessment at the bottom before spending time on this. The odds are poor. It
 costs a form and nothing else, which is the only reason to do it.
