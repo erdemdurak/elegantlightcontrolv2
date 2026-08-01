@@ -1,4 +1,7 @@
-# CarPlay entitlement request — draft submission
+# CarPlay entitlement request
+
+**SUBMITTED 2026-08-01.** Apple's confirmation page: *"We'll review your request and contact
+you soon with a status update."* Nothing to do but wait — see *After submitting* at the end.
 
 **Form:** <https://developer.apple.com/contact/request/carplay/>
 
@@ -85,3 +88,26 @@ weeks. Many requests are never answered at all.
 
 **If it is declined**, nothing is lost and nothing changes: Siri already does the controlling,
 and it works. This is a lottery ticket, not a plan.
+
+
+---
+
+## After submitting
+
+**How the answer arrives:** by email to the Apple ID on the developer account. There is no
+status page to poll and no ticket number. Case-by-case with no published SLA — reports range
+from a few days to several weeks, and some requests are never answered at all.
+
+**If granted**, the entitlement appears as a capability on the App ID
+`com.ambientlightcontroller.mobile` in the developer portal. It does not take effect on its
+own; the steps would be:
+
+1. Enable the CarPlay capability on the App ID.
+2. Regenerate the provisioning profile — the old one does not carry the entitlement, and iOS
+   validates the profile, which is the whole reason this could not be done locally.
+3. Add the entitlement key to the app's entitlements file.
+4. Build the CarPlay scene: a `CPListTemplate` of the twelve presets plus on/off, wired to the
+   existing BLE pipeline. Roughly a day's work, all of it native.
+
+**If declined or ignored**, nothing changes. Siri already does the controlling and it is
+confirmed working in the car. This was always a lottery ticket, not a plan.

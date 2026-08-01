@@ -215,10 +215,10 @@ Two things Apple changed that the old plan missed:
       foregrounding actually annoy you in practice".
 - [x] **1d. Shortcuts automation** — CarPlay-connect automation opens the app, which then
       applies the day or night profile by itself.
-- [ ] **1e. Driving-task entitlement request** *(long shot)*. Draft submission written up in
-      `docs/carplay-entitlement-request.md`, ready to paste. The honest blocker is that the app
-      is not distributed, which Apple's criteria expect; publishing it, even as a free listing,
-      is the single biggest lever on the odds.
+- [~] **1e. Driving-task entitlement request** — **submitted 2026-08-01**, awaiting Apple.
+      Reply comes by email; there is no status page. See `docs/carplay-entitlement-request.md`
+      for what was sent and what to do if it is granted. Expect a decline: the app is not
+      distributed, which Apple's criteria expect. Nothing depends on the outcome.
 
 ### Task 2 — Gradient tests
 
