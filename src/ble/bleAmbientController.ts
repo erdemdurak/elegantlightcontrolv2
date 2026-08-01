@@ -676,11 +676,12 @@ export class BleAmbientController {
 
     const areas: Area[] = target === "both" ? [1, 2] : [target === "area1" ? 1 : 2];
 
-    // `breathe` is run by the controller itself, on top of the static colour we just sent, so
-    // it keeps going once the app is closed. Every other mode is either static or computed on
-    // the phone, and both need the chip left in static — otherwise a breathe selected earlier
-    // carries on modulating underneath.
-    const hardwareMode: HardwareMode = settings.mode === "breathe" ? "breathe" : "static";
+    // `breathe` and `auto` are run by the controller itself, so they keep going once the app
+    // is closed — breathe on top of the static colour we just sent, auto on the chip's own
+    // palette. Every other mode is static or computed on the phone, and both need the chip
+    // left in static, or a chip mode selected earlier carries on underneath.
+    const hardwareMode: HardwareMode =
+      settings.mode === "breathe" ? "breathe" : settings.mode === "auto" ? "automatic" : "static";
 
     if (!variant) {
       // No zone addressing known yet: broadcast once regardless of the selected area.

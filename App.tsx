@@ -49,7 +49,7 @@ import { BUILT_IN_THEMES, themeToSettings, type Theme } from "./src/themes";
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v32 · renamed Elegant Light";
+const BUILD_LABEL = "v2 · lenze-v33 · auto mode";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -89,7 +89,7 @@ const presetColors = [
   "#FFB870", // warm white — soft on purpose, the factory cabin tone
 ];
 
-const modeOptions: AmbientMode[] = ["monochrome", "gradient", "strobe", "breathe"];
+const modeOptions: AmbientMode[] = ["monochrome", "gradient", "strobe", "breathe", "auto"];
 
 const speedLabels: Record<number, string> = {
   1: "Extra Slow",
@@ -158,15 +158,18 @@ const vendorCommands: Array<{ label: string; text?: string; hex?: string }> = [
   { label: "RED ch3", text: "[09ff0000]" },
 ];
 
+/** Modes the controller runs itself. Driving these from here would fight the chip. */
+const CHIP_MODES = new Set<AmbientMode>(["breathe", "auto"]);
+
 /**
  * Whether the phone has to compute this mode's frames.
  *
- * `breathe` is handled by the controller now — it modulates the brightness of the static
- * colour we sent, so it keeps running with the app closed. Driving it from here as well would
- * fight the chip and burn BLE bandwidth for nothing.
+ * `breathe` and `auto` are handled by the controller, so they keep running with the app
+ * closed. Everything else is computed here and stops when the app is backgrounded, unless
+ * the audio keepalive is holding it up.
  */
 function isPhoneDrivenMode(settings: LightSettings): boolean {
-  return settings.mode !== "breathe" && isAnimatedMode(settings);
+  return !CHIP_MODES.has(settings.mode) && isAnimatedMode(settings);
 }
 
 const defaultPalette = ["#3B82F6", "#E84393", "#FF6A00", "#00B894"];
@@ -1715,8 +1718,9 @@ export default function App() {
 
           <Text style={styles.sliderLabel}>Mode</Text>
           <Text style={styles.helperText}>
-            Breathe runs on the controller, so it keeps going with the app closed. Gradient and
-            strobe are computed on the phone and stop when you leave the app.
+            Breathe and auto run on the controller and keep going with the app closed — breathe
+            keeps your colour, auto uses the chip's own palette. Gradient and strobe are
+            computed on the phone, so they use your colours but need the app running.
           </Text>
           <View style={styles.row}>
             {modeOptions.map((mode) => (

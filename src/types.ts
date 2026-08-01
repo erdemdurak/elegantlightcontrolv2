@@ -1,4 +1,9 @@
-export type AmbientMode = "monochrome" | "gradient" | "strobe" | "breathe";
+/**
+ * `breathe` and `auto` are run by the controller itself and survive the app closing.
+ * `gradient` and `strobe` are computed on the phone, so they need it in the foreground
+ * (or the audio keepalive) but can use colours you pick.
+ */
+export type AmbientMode = "monochrome" | "gradient" | "strobe" | "breathe" | "auto";
 
 export type GradientSpeed = 1 | 2 | 3 | 4 | 5;
 
