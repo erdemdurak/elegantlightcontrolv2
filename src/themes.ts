@@ -120,9 +120,9 @@ export const BUILT_IN_THEMES: Theme[] = [
   {
     id: "meadow",
     name: "Meadow",
-    area1: { hex: "#00FFA3", brightness: 10 },
+    area1: { hex: "#00FFA3", brightness: 100 },
     area2: { hex: "#00BA43", brightness: 100 },
-    hint: "Vents at full green with the door lines barely lit — the most asymmetric pair here",
+    hint: "Mint doors, deeper green vents — both at full, the brightest pair here",
   },
   {
     id: "bloom",
