@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v47 · meadow 100";
+const BUILD_LABEL = "v2 · lenze-v48 · autoconnect fix";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -402,6 +402,18 @@ export default function App() {
             setLastDeviceId(parsed.lastDeviceId);
           }
 
+          if (parsed.activeThemeId && BUILT_IN_THEMES.some((t) => t.id === parsed.activeThemeId)) {
+            setActiveThemeId(parsed.activeThemeId);
+          }
+
+          if (
+            parsed.activeTarget === "area1" ||
+            parsed.activeTarget === "area2" ||
+            parsed.activeTarget === "both"
+          ) {
+            setActiveTarget(parsed.activeTarget);
+          }
+
           if (typeof parsed.backgroundEffects === "boolean") {
             setBackgroundEffects(parsed.backgroundEffects);
           }
@@ -446,6 +458,8 @@ export default function App() {
         savedPalette,
         lockedProfile,
         lastDeviceId,
+        activeThemeId,
+        activeTarget,
         backgroundEffects,
         autoDayNight,
         dayProfile,
@@ -461,6 +475,8 @@ export default function App() {
     savedPalette,
     lockedProfile,
     lastDeviceId,
+    activeThemeId,
+    activeTarget,
     backgroundEffects,
     autoDayNight,
     dayProfile,
@@ -802,26 +818,52 @@ export default function App() {
     }
 
     let cancelled = false;
+    let stop: ReturnType<typeof setTimeout> | undefined;
     const ble = getBle();
 
-    ble.startScan((scanned) => {
-      if (cancelled || scanned.id !== lastDeviceId) {
+    void (async () => {
+      try {
+        // The BLE stack is not powered on the instant the app launches — CBCentralManager
+        // starts in `unknown` and takes a moment. Scanning before then fails, and startScan
+        // swallows the error, so auto-reconnect silently did nothing on a cold start and the
+        // controller had to be tapped by hand.
+        await ble.ensureReady();
+      } catch {
         return;
       }
 
-      cancelled = true;
-      ble.stopScan();
-      void handleConnect(scanned);
-    });
+      if (cancelled) {
+        return;
+      }
 
-    const stop = setTimeout(() => {
-      cancelled = true;
-      ble.stopScan();
-    }, 15000);
+      setStatusMessage("Looking for the controller...");
+
+      ble.startScan((scanned) => {
+        if (cancelled || scanned.id !== lastDeviceId) {
+          return;
+        }
+
+        cancelled = true;
+        ble.stopScan();
+        void handleConnect(scanned);
+      });
+
+      stop = setTimeout(() => {
+        if (cancelled) {
+          return;
+        }
+
+        cancelled = true;
+        ble.stopScan();
+        setStatusMessage("Controller not found — tap Scan to connect.");
+      }, 20000);
+    })();
 
     return () => {
       cancelled = true;
-      clearTimeout(stop);
+      if (stop) {
+        clearTimeout(stop);
+      }
       ble.stopScan();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

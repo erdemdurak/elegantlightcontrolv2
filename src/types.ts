@@ -59,6 +59,13 @@ export type AppStateSnapshot = {
    * costs nothing; on is the only expensive thing this app does.
    */
   backgroundEffects?: boolean;
+  /**
+   * Which preset chip is highlighted, and which area the controls are driving. Neither
+   * changes the lights — the colours themselves are already in area1/area2 — but losing them
+   * on every launch made a restored cabin look like it belonged to no preset at all.
+   */
+  activeThemeId?: string | null;
+  activeTarget?: ControlTarget;
   /** Apply a profile automatically on connect, chosen by the clock. */
   autoDayNight?: boolean;
   dayProfile?: DayNightProfile;
