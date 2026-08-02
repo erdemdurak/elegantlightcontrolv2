@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v44 · background toggle";
+const BUILD_LABEL = "v2 · lenze-v45 · splash · gradient persists";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -597,9 +597,12 @@ export default function App() {
 
   const handleApplyTheme = (theme: Theme) => {
     setActiveThemeId(theme.id);
+    // A preset sets colour, brightness and mode — never the gradient stops. Those are a
+    // separate thing the user built by hand, and overwriting them meant a round trip through
+    // any preset silently emptied the list.
     applyPair(
-      normalizeLight(themeToSettings(theme, "area1")),
-      normalizeLight(themeToSettings(theme, "area2")),
+      normalizeLight({ ...themeToSettings(theme, "area1"), gradientColors: area1.gradientColors }),
+      normalizeLight({ ...themeToSettings(theme, "area2"), gradientColors: area2.gradientColors }),
       theme.name,
     );
   };

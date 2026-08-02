@@ -111,6 +111,27 @@ export const BUILT_IN_THEMES: Theme[] = [
     hint: "Indigo doors, magenta vents — the two ends of violet against each other",
   },
   {
+    id: "dune",
+    name: "Dune",
+    area1: { hex: "#FFBB70", brightness: 65 },
+    area2: { hex: "#00B894", brightness: 80 },
+    hint: "Warm sand doors, deep teal vents — the warmest and coolest halves of the palette",
+  },
+  {
+    id: "meadow",
+    name: "Meadow",
+    area1: { hex: "#00FFA3", brightness: 70 },
+    area2: { hex: "#00B984", brightness: 80 },
+    hint: "Mint doors, deeper green vents — one hue, two depths",
+  },
+  {
+    id: "bloom",
+    name: "Bloom",
+    area1: { hex: "#EB4393", brightness: 60 },
+    area2: { hex: "#00BBFF", brightness: 80 },
+    hint: "Rose doors, sky vents — the lightest pair, both softened rather than neon",
+  },
+  {
     id: "alpine",
     name: "Alpine",
     area1: { hex: "#FFFFFF", brightness: 50 },

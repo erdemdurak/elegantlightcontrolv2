@@ -137,6 +137,9 @@ enum LightPresetOption: String, AppEnum {
   case nightshade
   case amethyst
   case ultraviolet
+  case dune
+  case meadow
+  case bloom
   case alpine
 
   static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Preset")
@@ -152,6 +155,9 @@ enum LightPresetOption: String, AppEnum {
     .nightshade: "Nightshade",
     .amethyst: "Amethyst",
     .ultraviolet: "Ultraviolet",
+    .dune: "Dune",
+    .meadow: "Meadow",
+    .bloom: "Bloom",
     .alpine: "Alpine",
   ]
 }
