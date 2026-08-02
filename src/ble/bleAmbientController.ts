@@ -694,7 +694,14 @@ export class BleAmbientController {
     for (const area of areas) {
       await this.writePayloads(variant.color(rgb, area), bleTarget);
       await this.writePayloads(variant.brightness(settings.brightness, area), bleTarget);
-      await this.writeHardwareMode(family, hardwareMode, area, bleTarget);
+      // Breathe is sent for both areas whatever the caller asked for — the controller only
+      // honours it globally, and a single-area breathe frame is silently ignored.
+      await this.writeHardwareMode(
+        family,
+        hardwareMode,
+        hardwareMode === "breathe" ? undefined : area,
+        bleTarget,
+      );
     }
   }
 

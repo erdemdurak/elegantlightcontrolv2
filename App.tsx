@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v45 · splash · gradient persists";
+const BUILD_LABEL = "v2 · lenze-v46 · breathe both · colours";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -604,6 +604,25 @@ export default function App() {
       normalizeLight({ ...themeToSettings(theme, "area1"), gradientColors: area1.gradientColors }),
       normalizeLight({ ...themeToSettings(theme, "area2"), gradientColors: area2.gradientColors }),
       theme.name,
+    );
+  };
+
+  /**
+   * Breathe is whole-controller in practice. Selecting it for Area 2 alone did nothing in the
+   * car, so the chip appears to run it globally regardless of what the per-area mode byte says.
+   * Rather than leave a button that silently fails, breathe is applied to both areas — which
+   * also stops a later write to the other area sending `static` and cancelling it.
+   */
+  const handleSelectMode = (mode: AmbientMode) => {
+    if (mode !== "breathe") {
+      applyAndSend({ ...activeSettings, mode });
+      return;
+    }
+
+    applyPair(
+      normalizeLight({ ...area1, mode }),
+      normalizeLight({ ...area2, mode }),
+      "breathe",
     );
   };
 
@@ -2014,7 +2033,7 @@ export default function App() {
               <Pressable
                 key={mode}
                 style={[styles.modeButton, activeSettings.mode === mode ? styles.modeActive : null]}
-                onPress={() => applyAndSend({ ...activeSettings, mode })}
+                onPress={() => handleSelectMode(mode)}
               >
                 <Text style={styles.modeText}>{modeLabels[mode]}</Text>
               </Pressable>

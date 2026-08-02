@@ -135,7 +135,7 @@ enum LightPresetOption: String, AppEnum {
   case copper
   case emerald
   case nightshade
-  case amethyst
+  case dusk
   case ultraviolet
   case dune
   case meadow
@@ -153,7 +153,7 @@ enum LightPresetOption: String, AppEnum {
     .copper: "Copper",
     .emerald: "Emerald",
     .nightshade: "Nightshade",
-    .amethyst: "Amethyst",
+    .dusk: "Dusk",
     .ultraviolet: "Ultraviolet",
     .dune: "Dune",
     .meadow: "Meadow",
