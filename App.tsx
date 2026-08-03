@@ -36,6 +36,7 @@ import type {
   AmbientMode,
   AppStateSnapshot,
   DayNightProfile,
+  ScheduleSlot,
   ControlTarget,
   LightSettings,
   LockedProfile,
@@ -47,9 +48,8 @@ import { hexToHsv, hsvToHex, vibrantSaturation } from "./src/utils/color";
 import { InteriorPreview } from "./src/components/InteriorPreview";
 import {
   BUILT_IN_THEMES,
-  DEFAULT_DAY_THEME_ID,
-  DEFAULT_NIGHT_THEME_ID,
-  isNightAt,
+  defaultSchedule,
+  slotAt,
   themeToProfile,
   themeToSettings,
   type Theme,
@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v48 · autoconnect fix";
+const BUILD_LABEL = "v2 · lenze-v49 · schedule · gradient both";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -192,15 +192,6 @@ const vendorCommands: Array<{ label: string; text?: string; hex?: string }> = [
   { label: "RED ch3", text: "[09ff0000]" },
 ];
 
-const defaultDayProfile: DayNightProfile = themeToProfile(DEFAULT_DAY_THEME_ID) ?? {
-  area1: defaultArea1,
-  area2: defaultArea2,
-};
-const defaultNightProfile: DayNightProfile = themeToProfile(DEFAULT_NIGHT_THEME_ID) ?? {
-  area1: defaultArea1,
-  area2: defaultArea2,
-};
-
 /** Modes the controller runs itself. Driving these from here would fight the chip. */
 const CHIP_MODES = new Set<AmbientMode>(["breathe", "auto"]);
 
@@ -317,8 +308,7 @@ export default function App() {
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
   const [backgroundEffects, setBackgroundEffects] = useState(true);
   const [autoDayNight, setAutoDayNight] = useState(false);
-  const [dayProfile, setDayProfile] = useState<DayNightProfile>(defaultDayProfile);
-  const [nightProfile, setNightProfile] = useState<DayNightProfile>(defaultNightProfile);
+  const [schedule, setSchedule] = useState<ScheduleSlot[]>(defaultSchedule);
   /** Bumped whenever CarPlay is seen active, to re-trigger the reconnect effect. */
   const [carPlayTick, setCarPlayTick] = useState(0);
   /** Guards the day/night preset so one connection cannot apply it twice. */
@@ -422,17 +412,32 @@ export default function App() {
             setAutoDayNight(parsed.autoDayNight);
           }
 
-          // Profiles superseded the preset ids. Older saves carry only an id, so build a
-          // profile from it once rather than silently resetting the user's choice.
-          const day = parsed.dayProfile ?? (parsed.dayThemeId ? themeToProfile(parsed.dayThemeId) : null);
-          if (day) {
-            setDayProfile({ area1: normalizeLight(day.area1), area2: normalizeLight(day.area2) });
-          }
+          // The three-slot schedule replaced a day/night pair, which replaced a pair of preset
+          // ids. Both older shapes are read once so nobody's tuning is silently reset.
+          if (Array.isArray(parsed.schedule) && parsed.schedule.length > 0) {
+            setSchedule(
+              parsed.schedule.map((slot) => ({
+                ...slot,
+                startHour: clamp(Math.round(slot.startHour), 0, 23),
+                area1: normalizeLight(slot.area1),
+                area2: normalizeLight(slot.area2),
+              })),
+            );
+          } else {
+            const day = parsed.dayProfile ?? (parsed.dayThemeId ? themeToProfile(parsed.dayThemeId) : null);
+            const night =
+              parsed.nightProfile ?? (parsed.nightThemeId ? themeToProfile(parsed.nightThemeId) : null);
 
-          const night =
-            parsed.nightProfile ?? (parsed.nightThemeId ? themeToProfile(parsed.nightThemeId) : null);
-          if (night) {
-            setNightProfile({ area1: normalizeLight(night.area1), area2: normalizeLight(night.area2) });
+            if (day || night) {
+              setSchedule((current) =>
+                current.map((slot) => {
+                  const source = slot.id === "night" ? night : slot.id === "morning" ? day : null;
+                  return source
+                    ? { ...slot, area1: normalizeLight(source.area1), area2: normalizeLight(source.area2) }
+                    : slot;
+                }),
+              );
+            }
           }
         }
       } catch {
@@ -462,8 +467,7 @@ export default function App() {
         activeTarget,
         backgroundEffects,
         autoDayNight,
-        dayProfile,
-        nightProfile,
+        schedule,
       };
       void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     }, 400);
@@ -479,8 +483,7 @@ export default function App() {
     activeTarget,
     backgroundEffects,
     autoDayNight,
-    dayProfile,
-    nightProfile,
+    schedule,
     hydrated,
   ]);
 
@@ -630,16 +633,26 @@ export default function App() {
    * also stops a later write to the other area sending `static` and cancelling it.
    */
   const handleSelectMode = (mode: AmbientMode) => {
-    if (mode !== "breathe") {
-      applyAndSend({ ...activeSettings, mode });
+    if (mode === "breathe") {
+      applyPair(normalizeLight({ ...area1, mode }), normalizeLight({ ...area2, mode }), "breathe");
       return;
     }
 
-    applyPair(
-      normalizeLight({ ...area1, mode }),
-      normalizeLight({ ...area2, mode }),
-      "breathe",
-    );
+    // An area only animates if it is in gradient mode *and* holds at least two stops, so
+    // choosing gradient for Both while one area's list was short left that half sitting
+    // static — it looked like gradient only worked on the doors. Targeting Both now gives
+    // both areas the same stops, which is also the only way they cycle in step.
+    if (mode === "gradient" && activeTarget === "both") {
+      const gradientColors = activeSettings.gradientColors;
+      applyPair(
+        normalizeLight({ ...area1, mode, gradientColors }),
+        normalizeLight({ ...area2, mode, gradientColors }),
+        "gradient",
+      );
+      return;
+    }
+
+    applyAndSend({ ...activeSettings, mode });
   };
 
   /** Mirrors a preset across the cabin — vents get the doors' colour and vice versa. */
@@ -881,34 +894,28 @@ export default function App() {
   }, [device, runSiriCommand]);
 
   /**
-   * Apply the clock-appropriate preset once per connection, but only when actually in the
-   * car — otherwise connecting at a desk would silently overwrite whatever was set.
+   * Apply the slot in force once per connection.
+   *
+   * This used to be gated on CarPlay being detected, which read the audio route — but that
+   * route only reports CarPlay reliably while our own audio session is active, which it
+   * usually is not. The gate was meant to stop the cabin being overwritten at a desk; in
+   * practice it stopped the feature working at all, so it is gone.
    */
   useEffect(() => {
     if (!device || !autoDayNight || dayNightAppliedRef.current) {
       return;
     }
 
-    let cancelled = false;
+    const slot = slotAt(schedule, new Date());
+    if (!slot) {
+      return;
+    }
 
-    void isCarPlayActive().then((inCar) => {
-      if (cancelled || !inCar || dayNightAppliedRef.current) {
-        return;
-      }
-
-      const night = isNightAt(new Date());
-      const profile = night ? nightProfile : dayProfile;
-
-      dayNightAppliedRef.current = true;
-      setActiveThemeId(null);
-      applyPair(normalizeLight(profile.area1), normalizeLight(profile.area2), night ? "Night" : "Day");
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    dayNightAppliedRef.current = true;
+    setActiveThemeId(null);
+    applyPair(normalizeLight(slot.area1), normalizeLight(slot.area2), slot.name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [device, autoDayNight, dayProfile, nightProfile]);
+  }, [device, autoDayNight, schedule]);
 
   // Arm it again for the next connection.
   useEffect(() => {
@@ -1451,55 +1458,79 @@ export default function App() {
   const currentStep = sweepIndex >= 0 ? sweepPlan[sweepIndex] : null;
   const currentZoneStep = zoneIndex >= 0 ? zonePlan[zoneIndex] : null;
 
-  const renderDayNight = (
-    label: string,
-    profile: DayNightProfile,
-    save: (next: DayNightProfile) => void,
-  ) => (
-    <View style={styles.stepCard}>
-      <Text style={styles.stepCounter}>{label}</Text>
+  const updateSlot = (id: string, patch: Partial<ScheduleSlot>) => {
+    setSchedule((current) => current.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot)));
+  };
 
-      {(["area1", "area2"] as const).map((key) => {
-        const settings = profile[key];
-        const hex = hsvToHex(settings.hue, settings.saturation, settings.value ?? 100);
+  const renderSlot = (slot: ScheduleSlot) => {
+    const active = slotAt(schedule, new Date())?.id === slot.id;
 
-        return (
-          <View key={key} style={styles.areaCard}>
-            <View style={[styles.areaSwatch, { backgroundColor: hex }]} />
-            <View style={styles.areaTextWrap}>
-              <Text style={styles.areaLabel}>
-                {key === "area1" ? "Area 1 · doors" : "Area 2 · vents"}
-              </Text>
-              <Text style={styles.areaValue}>
-                {normalizeHex(hex)} · {Math.round(settings.brightness)}% · {settings.mode}
-              </Text>
-            </View>
+    return (
+      <View key={slot.id} style={styles.stepCard}>
+        <View style={styles.slotHeader}>
+          <Text style={styles.stepCounter}>
+            {slot.name}
+            {active ? "  · now" : ""}
+          </Text>
+          <View style={styles.slotClock}>
+            <Pressable
+              style={styles.slotStep}
+              onPress={() => updateSlot(slot.id, { startHour: (slot.startHour + 23) % 24 })}
+            >
+              <Text style={styles.slotStepText}>−</Text>
+            </Pressable>
+            <Text style={styles.slotTime}>{String(slot.startHour).padStart(2, "0")}:00</Text>
+            <Pressable
+              style={styles.slotStep}
+              onPress={() => updateSlot(slot.id, { startHour: (slot.startHour + 1) % 24 })}
+            >
+              <Text style={styles.slotStepText}>+</Text>
+            </Pressable>
           </View>
-        );
-      })}
+        </View>
 
-      <View style={styles.row}>
-        <Pressable
-          style={styles.actionButton}
-          onPress={() => {
-            save({ area1, area2 });
-            setStatusMessage(`${label} saved from the current cabin.`);
-          }}
-        >
-          <Text style={styles.actionText}>Save Current</Text>
-        </Pressable>
-        <Pressable
-          style={styles.actionButtonSecondary}
-          onPress={() => {
-            setActiveThemeId(null);
-            applyPair(normalizeLight(profile.area1), normalizeLight(profile.area2), label);
-          }}
-        >
-          <Text style={styles.actionText}>Apply Now</Text>
-        </Pressable>
+        {(["area1", "area2"] as const).map((key) => {
+          const settings = slot[key];
+          const hex = hsvToHex(settings.hue, settings.saturation, settings.value ?? 100);
+
+          return (
+            <View key={key} style={styles.areaCard}>
+              <View style={[styles.areaSwatch, { backgroundColor: hex }]} />
+              <View style={styles.areaTextWrap}>
+                <Text style={styles.areaLabel}>
+                  {key === "area1" ? "Area 1 · doors" : "Area 2 · vents"}
+                </Text>
+                <Text style={styles.areaValue}>
+                  {normalizeHex(hex)} · {Math.round(settings.brightness)}% · {settings.mode}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+
+        <View style={styles.row}>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => {
+              updateSlot(slot.id, { area1, area2 });
+              setStatusMessage(`${slot.name} saved from the current cabin.`);
+            }}
+          >
+            <Text style={styles.actionText}>Save Current</Text>
+          </Pressable>
+          <Pressable
+            style={styles.actionButtonSecondary}
+            onPress={() => {
+              setActiveThemeId(null);
+              applyPair(normalizeLight(slot.area1), normalizeLight(slot.area2), slot.name);
+            }}
+          >
+            <Text style={styles.actionText}>Apply Now</Text>
+          </Pressable>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderSwatch = (color: string, deletable = false) => {
     const isSelected = normalizeHex(color) === normalizeHex(currentColor);
@@ -2126,11 +2157,12 @@ export default function App() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>4. Day / Night</Text>
+          <Text style={styles.sectionTitle}>4. Schedule</Text>
           <Text style={styles.helperText}>
-            Each profile stores both areas in full — colour, brightness and mode. Set the cabin
-            up in Light Control, then Save Current here. Applied once when the app connects with
-            the phone plugged into the car, never at a desk. Night runs 19:00–07:00.
+            Three intervals. Each stores both areas in full — colour, brightness and mode — and
+            runs from its start time until the next one begins, the last wrapping past midnight.
+            Set the cabin up in Light Control, then Save Current on the interval you want it on.
+            Applied once each time the app connects.
           </Text>
 
           <View style={styles.row}>
@@ -2144,8 +2176,7 @@ export default function App() {
             </Pressable>
           </View>
 
-          {renderDayNight("Day", dayProfile, setDayProfile)}
-          {renderDayNight("Night", nightProfile, setNightProfile)}
+          {[...schedule].sort((a, b) => a.startHour - b.startHour).map(renderSlot)}
         </View>
 
         <View style={styles.card}>
@@ -2550,6 +2581,38 @@ const styles = StyleSheet.create({
   swatchActive: {
     borderColor: "#FFFFFF",
     borderWidth: 3,
+  },
+  slotHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  slotClock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  slotStep: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#3B4874",
+    backgroundColor: "#232D52",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  slotStepText: {
+    color: "#D3DDF6",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  slotTime: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    minWidth: 54,
+    textAlign: "center",
   },
   paletteDivider: {
     height: 1,

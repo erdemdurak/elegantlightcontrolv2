@@ -1,4 +1,4 @@
-import type { LightSettings } from "./types";
+import type { LightSettings, ScheduleSlot } from "./types";
 import { hexToHsv } from "./utils/color";
 
 /**
@@ -143,20 +143,45 @@ export const BUILT_IN_THEMES: Theme[] = [
 export const DEFAULT_DAY_THEME_ID = "burmester";
 export const DEFAULT_NIGHT_THEME_ID = "night-drive";
 
-/** Night starts at this hour, and day at DAY_START_HOUR. Local clock, 24h. */
-const NIGHT_START_HOUR = 19;
-const DAY_START_HOUR = 7;
-
 /**
- * Whether the cabin should be on its night preset.
+ * The slot in force at a given time.
  *
- * Deliberately the clock rather than actual sunrise/sunset: real sun times need the user's
- * location, and this app asks for no location permission at all. A fixed boundary is wrong by
- * an hour or so at the solstices, which for choosing between amber and blue is close enough.
+ * Slots are sorted by start hour and each runs until the next one begins; before the earliest
+ * start the previous day's last slot is still running, which is what the wrap handles.
+ *
+ * Deliberately the clock rather than real sunrise/sunset: sun times need the user's location
+ * and this app asks for no location permission at all.
  */
-export function isNightAt(date: Date): boolean {
+export function slotAt(slots: ScheduleSlot[], date: Date): ScheduleSlot | null {
+  if (slots.length === 0) {
+    return null;
+  }
+
+  const ordered = [...slots].sort((a, b) => a.startHour - b.startHour);
   const hour = date.getHours();
-  return hour >= NIGHT_START_HOUR || hour < DAY_START_HOUR;
+  const started = ordered.filter((slot) => slot.startHour <= hour);
+
+  return started.length > 0 ? started[started.length - 1] : ordered[ordered.length - 1];
+}
+
+/** Three sensible starting points, replaced the moment the user saves over them. */
+export function defaultSchedule(): ScheduleSlot[] {
+  const build = (id: string, name: string, startHour: number, themeId: string): ScheduleSlot => {
+    const profile = themeToProfile(themeId);
+    return {
+      id,
+      name,
+      startHour,
+      area1: profile?.area1 ?? themeToSettings(BUILT_IN_THEMES[0], "area1"),
+      area2: profile?.area2 ?? themeToSettings(BUILT_IN_THEMES[0], "area2"),
+    };
+  };
+
+  return [
+    build("morning", "Morning", 7, "burmester"),
+    build("evening", "Evening", 17, "sunset"),
+    build("night", "Night", 21, "night-drive"),
+  ];
 }
 
 /** Both halves of a theme as a stored day/night profile. Used for defaults and migration. */

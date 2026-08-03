@@ -68,6 +68,9 @@ export type AppStateSnapshot = {
   activeTarget?: ControlTarget;
   /** Apply a profile automatically on connect, chosen by the clock. */
   autoDayNight?: boolean;
+  /** Three slots, applied on connect by the clock. */
+  schedule?: ScheduleSlot[];
+  /** Superseded by `schedule`; still read once so older saves migrate. */
   dayProfile?: DayNightProfile;
   nightProfile?: DayNightProfile;
   /** Superseded by dayProfile/nightProfile; still read once so older saves migrate. */
@@ -77,10 +80,20 @@ export type AppStateSnapshot = {
 
 /**
  * A full cabin state — both areas, each with its own colour, brightness and mode. Stored
- * rather than a preset id so day and night can be tuned freely instead of being limited to
- * the twelve built-ins.
+ * rather than a preset id so each time of day can be tuned freely instead of being limited to
+ * the built-in presets.
  */
 export type DayNightProfile = {
   area1: LightSettings;
   area2: LightSettings;
+};
+
+/**
+ * One slot of the daily schedule. `startHour` is local, 0-23, and a slot runs until the next
+ * slot's start — the last one wraps past midnight into the first.
+ */
+export type ScheduleSlot = DayNightProfile & {
+  id: string;
+  name: string;
+  startHour: number;
 };
