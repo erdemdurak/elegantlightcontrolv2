@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v49 · schedule · gradient both";
+const BUILD_LABEL = "v2 · lenze-v50 · chip speed · siri phrases";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -2138,7 +2138,13 @@ export default function App() {
             </View>
           ) : null}
 
-          <Text style={styles.sliderLabel}>Effect Speed: {speedLabels[activeSettings.speed]}</Text>
+          <Text style={styles.sliderLabel}>
+            Effect Speed: {speedLabels[activeSettings.speed]}
+          </Text>
+          <Text style={styles.helperText}>
+            Drives gradient and strobe on the phone, and is sent to the controller for breathe
+            and auto.
+          </Text>
           <Slider
             minimumValue={1}
             maximumValue={5}
@@ -2191,27 +2197,30 @@ export default function App() {
                 second or two of delay is it reconnecting, not a fault.
               </Text>
 
+              <Text style={styles.helperText}>
+                Every command is “{APP_SPOKEN_NAME}” followed by what you want — one shape for
+                all four.
+              </Text>
+
               <Text style={styles.sectionSubtitle}>Colour</Text>
-              <Text style={styles.monoLine}>Set {APP_SPOKEN_NAME} to «colour»</Text>
               <Text style={styles.monoLine}>{APP_SPOKEN_NAME} «colour»</Text>
               <Text style={styles.helperText}>{SIRI_COLOR_NAMES.join(" · ")}</Text>
 
               <Text style={styles.sectionSubtitle}>Preset</Text>
-              <Text style={styles.monoLine}>Apply «preset» in {APP_SPOKEN_NAME}</Text>
               <Text style={styles.monoLine}>{APP_SPOKEN_NAME} «preset»</Text>
               <Text style={styles.helperText}>
                 {BUILT_IN_THEMES.map((theme) => theme.name).join(" · ")}
               </Text>
 
               <Text style={styles.sectionSubtitle}>Mode</Text>
-              <Text style={styles.monoLine}>Set {APP_SPOKEN_NAME} mode to «mode»</Text>
+              <Text style={styles.monoLine}>{APP_SPOKEN_NAME} «mode»</Text>
               <Text style={styles.helperText}>
                 {modeOptions.map((mode) => SIRI_MODE_NAMES[mode] ?? mode).join(" · ")}
               </Text>
 
               <Text style={styles.sectionSubtitle}>Power</Text>
-              <Text style={styles.monoLine}>Turn on {APP_SPOKEN_NAME}</Text>
-              <Text style={styles.monoLine}>Turn off {APP_SPOKEN_NAME}</Text>
+              <Text style={styles.monoLine}>{APP_SPOKEN_NAME} on</Text>
+              <Text style={styles.monoLine}>{APP_SPOKEN_NAME} off</Text>
 
               <Text style={styles.sectionSubtitle}>Brightness</Text>
               <Text style={styles.helperText}>

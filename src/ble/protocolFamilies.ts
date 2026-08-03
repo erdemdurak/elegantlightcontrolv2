@@ -47,6 +47,11 @@ export type ProtocolFamily = {
   hardwareMode?(mode: HardwareMode, area?: Area): Payload[];
   /** Switch the strips off and on. Optional — most families here only ever had `powerOn`. */
   power?(on: boolean): Payload[];
+  /**
+   * Rate of the controller's own animations, 1-5. Not per-area — the frame carries a single
+   * byte for the whole controller. Meaningless unless a hardware mode is running.
+   */
+  hardwareSpeed?(value: number): Payload[];
 };
 
 /**
@@ -852,6 +857,10 @@ const lenze: ProtocolFamily = {
   preamble: () => [
     { label: "query state", bytes: lenzeFrame(0x00, []) },
     { label: "static mode both areas", bytes: lenzeModeFrame("static") },
+  ],
+  // CAPTURED: `55 02 23 S CK AA`, 1-5, matching the vendor app's own Speed slider.
+  hardwareSpeed: (value) => [
+    { label: `speed ${value}`, bytes: lenzeFrame(0x23, [Math.max(1, Math.min(5, Math.round(value)))]) },
   ],
   hardwareMode: (mode, area) => [
     { label: `${mode} mode${area ? ` area ${area}` : ""}`, bytes: lenzeModeFrame(mode, area) },

@@ -282,17 +282,26 @@ struct SetLightPowerIntent: AppIntent {
   }
 }
 
-/// Phrases must contain `\(.applicationName)`, so every one names the app somewhere.
+/**
+ Every phrase is "Elegant Light" followed by what you want, so there is one shape to remember
+ rather than a different preposition per intent. The longer forms stay as alternates because
+ Siri matches any of them.
+
+ The four short forms all look like `Elegant Light «enum»`. That is fine because the four
+ enums share no words — a colour is never also a preset name — so there is nothing for Siri to
+ confuse. Adding an overlapping value to any of them would break that.
+ */
 @available(iOS 16.0, *)
 struct AmbientShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
     AppShortcut(
       intent: SetLightColorIntent(),
-      // One parameter per phrase is a hard limit of AppShortcuts, so area cannot be spoken
-      // here. It stays a parameter on the intent itself, settable in the Shortcuts app.
+      // One parameter per phrase is a hard limit of AppShortcuts, so area cannot be spoken.
+      // It stays a parameter on the intent itself, settable in the Shortcuts app.
       phrases: [
-        "Set \(.applicationName) to \(\.$color)",
         "\(.applicationName) \(\.$color)",
+        "\(.applicationName) colour \(\.$color)",
+        "Set \(.applicationName) to \(\.$color)",
       ],
       shortTitle: "Set Colour",
       systemImageName: "paintpalette"
@@ -300,21 +309,27 @@ struct AmbientShortcuts: AppShortcutsProvider {
     AppShortcut(
       intent: ApplyLightPresetIntent(),
       phrases: [
-        "Apply \(\.$preset) in \(.applicationName)",
         "\(.applicationName) \(\.$preset)",
+        "\(.applicationName) preset \(\.$preset)",
       ],
       shortTitle: "Apply Preset",
       systemImageName: "square.grid.2x2"
     )
     AppShortcut(
       intent: SetLightModeIntent(),
-      phrases: ["Set \(.applicationName) mode to \(\.$mode)"],
+      phrases: [
+        "\(.applicationName) \(\.$mode)",
+        "\(.applicationName) mode \(\.$mode)",
+      ],
       shortTitle: "Set Mode",
       systemImageName: "waveform"
     )
     AppShortcut(
       intent: SetLightPowerIntent(),
-      phrases: ["Turn \(\.$state) \(.applicationName)"],
+      phrases: [
+        "\(.applicationName) \(\.$state)",
+        "Turn \(\.$state) \(.applicationName)",
+      ],
       shortTitle: "Power",
       systemImageName: "power"
     )

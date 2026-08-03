@@ -688,6 +688,7 @@ export class BleAmbientController {
       await this.writePayloads(family.color(rgb), bleTarget);
       await this.writePayloads(family.brightness(settings.brightness), bleTarget);
       await this.writeHardwareMode(family, hardwareMode, undefined, bleTarget);
+      await this.writeHardwareSpeed(family, hardwareMode, settings.speed, bleTarget);
       return;
     }
 
@@ -703,6 +704,8 @@ export class BleAmbientController {
         bleTarget,
       );
     }
+
+    await this.writeHardwareSpeed(family, hardwareMode, settings.speed, bleTarget);
   }
 
   private async writeHardwareMode(
@@ -716,6 +719,23 @@ export class BleAmbientController {
     }
 
     await this.writePayloads(family.hardwareMode(mode, area), bleTarget);
+  }
+
+  /**
+   * Rate for the controller's own animations. Only sent while one is running — the byte is
+   * global rather than per-area, so sending it in static mode would just be noise.
+   */
+  private async writeHardwareSpeed(
+    family: ProtocolFamily,
+    mode: HardwareMode,
+    speed: number,
+    bleTarget: BleTarget,
+  ): Promise<void> {
+    if (!family.hardwareSpeed || mode === "static") {
+      return;
+    }
+
+    await this.writePayloads(family.hardwareSpeed(speed), bleTarget);
   }
 
   /**
