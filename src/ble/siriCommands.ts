@@ -58,3 +58,17 @@ export function onCarPlayCommand(listener: () => void): () => void {
 
   return () => subscription.remove();
 }
+
+/**
+ * Hand the preset list to the CarPlay screen.
+ *
+ * CarPlay is native and cannot read `src/themes.ts`. The presets and their colours have been
+ * revised repeatedly, so a Swift copy would go stale — publishing them keeps one source of
+ * truth and lets the car draw the real colours.
+ */
+export function publishPresets(
+  presets: Array<{ id: string; name: string; area1: string; area2: string }>,
+): void {
+  const native = NativeModules.CarPlayBridge as { publishPresets?(json: string): void } | undefined;
+  native?.publishPresets?.(JSON.stringify(presets));
+}

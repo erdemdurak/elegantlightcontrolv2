@@ -39,6 +39,14 @@ RCT_EXPORT_MODULE()
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
+// The presets and their colours live in src/themes.ts and change often — they have already
+// been revised several times. Rather than keep a Swift copy that silently goes stale, JS
+// publishes them here and CarPlay draws whatever it finds.
+RCT_EXPORT_METHOD(publishPresets : (NSString *)json)
+{
+  [[NSUserDefaults standardUserDefaults] setObject:json forKey:@"carPlayPresets"];
+}
+
 - (void)handleCommand:(NSNotification *)note
 {
   // The payload is sent along, but JS reads UserDefaults anyway — that path is shared with

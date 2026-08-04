@@ -5,32 +5,40 @@ import UIKit
 /**
  The CarPlay app.
 
- Apple granted the **Driving Task** entitlement on 2026-08-04, which allows CPListTemplate,
- CPGridTemplate, CPInformationTemplate, CPTabBarTemplate, CPAlertTemplate and
- CPActionSheetTemplate, to a maximum depth of five templates. A flat list of presets fits that
- comfortably and is the safest thing to offer a driver: every row is one tap, applies
- immediately, and needs no reading.
+ Shaped for someone driving, not for feature parity with the phone. Everything reachable in
+ one tap, the first screen a grid rather than a list — big targets, no scrolling, no reading a
+ column of text at speed — and a brightness row, because with a sleeping passenger the thing
+ you want is *dimmer*, which otherwise needs the phone or your voice.
 
- Handover to the app reuses the Siri path — `PendingCommand` in UserDefaults, drained by JS —
- because it is already proven and because CarPlay can launch the app straight into the
- background, where there may be no JS runtime yet. A notification is posted as well so a
- running app reacts at once instead of waiting for a foreground event; see CarPlayBridge.m.
+ Presets come from `carPlayPresets` in UserDefaults, published by JS. They change often and a
+ Swift copy would go stale; this way the source of truth stays in src/themes.ts.
 
- Marked iOS 16 because it reads the preset list from `LightPresetOption`, which is an AppEnum.
- Keeping one list rather than a third copy is worth more than iOS 15 support on a personal app.
+ Handover reuses the Siri path — a command in UserDefaults, drained by JS — because CarPlay can
+ launch the app straight into the background where there is no JS runtime yet. A notification
+ goes out too so a running app reacts immediately; see CarPlayBridge.m.
  */
 @available(iOS 16.0, *)
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   static let commandNotification = Notification.Name("ElegantLightCarPlayCommand")
 
+  /// Grid templates are capped at eight buttons by CarPlay.
+  private static let gridLimit = 8
+
   private var interfaceController: CPInterfaceController?
+
+  private struct Preset: Decodable {
+    let id: String
+    let name: String
+    let area1: String
+    let area2: String
+  }
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-    interfaceController.setRootTemplate(Self.makeRootTemplate(), animated: false, completion: nil)
+    interfaceController.setRootTemplate(makeRootTemplate(), animated: false, completion: nil)
   }
 
   func templateApplicationScene(
@@ -40,9 +48,40 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     self.interfaceController = nil
   }
 
-  private static func makeRootTemplate() -> CPListTemplate {
-    let presets = LightPresetOption.allCases.map { option in
-      row(title: option.displayName) { ["type": "preset", "value": option.rawValue] }
+  // MARK: - Templates
+
+  private func makeRootTemplate() -> CPTemplate {
+    let presets = Self.loadPresets()
+    let favourites = Array(presets.prefix(Self.gridLimit))
+
+    let grid = CPGridTemplate(
+      title: "Presets",
+      gridButtons: favourites.map { preset in
+        CPGridButton(
+          titleVariants: [preset.name],
+          image: Self.swatch(preset)
+        ) { [weak self] _ in
+          self?.send(["type": "preset", "value": preset.id])
+        }
+      }
+    )
+    grid.tabTitle = "Presets"
+    grid.tabImage = UIImage(systemName: "square.grid.2x2")
+
+    let control = CPListTemplate(title: "Control", sections: Self.controlSections(rest: Array(presets.dropFirst(Self.gridLimit)), delegate: self))
+    control.tabTitle = "Control"
+    control.tabImage = UIImage(systemName: "slider.horizontal.3")
+
+    return CPTabBarTemplate(templates: [grid, control])
+  }
+
+  private static func controlSections(rest: [Preset], delegate: CarPlaySceneDelegate) -> [CPListSection] {
+    let brightness = [
+      ("Dim", "20"),
+      ("Half", "50"),
+      ("Full", "100"),
+    ].map { label, value in
+      row(title: label) { ["type": "brightness", "value": value, "area": "both"] }
     }
 
     let power = [
@@ -50,36 +89,91 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
       row(title: "Lights Off") { ["type": "power", "value": "off"] },
     ]
 
-    let template = CPListTemplate(
-      title: "Elegant Light",
-      sections: [
-        CPListSection(items: presets, header: "Presets", sectionIndexTitle: nil),
-        CPListSection(items: power, header: "Power", sectionIndexTitle: nil),
-      ]
-    )
+    var sections = [
+      CPListSection(items: brightness, header: "Brightness", sectionIndexTitle: nil),
+      CPListSection(items: power, header: "Power", sectionIndexTitle: nil),
+    ]
 
-    return template
+    if !rest.isEmpty {
+      let more = rest.map { preset in
+        row(title: preset.name) { ["type": "preset", "value": preset.id] }
+      }
+      sections.append(CPListSection(items: more, header: "More presets", sectionIndexTitle: nil))
+    }
+
+    return sections
   }
 
-  /// A row that fires its command and completes straight away — no confirmation step, because
-  /// a driver should never be left holding a half-finished interaction.
+  /// A row that fires and completes at once — a driver should never be left mid-interaction.
   private static func row(
     title: String,
     command: @escaping () -> [String: String]
   ) -> CPListItem {
     let item = CPListItem(text: title, detailText: nil)
-
     item.handler = { _, completion in
-      let payload = command()
-      PendingCommand.write(payload)
-      NotificationCenter.default.post(
-        name: CarPlaySceneDelegate.commandNotification,
-        object: nil,
-        userInfo: payload
-      )
+      dispatch(command())
       completion()
     }
-
     return item
+  }
+
+  private func send(_ payload: [String: String]) {
+    Self.dispatch(payload)
+  }
+
+  private static func dispatch(_ payload: [String: String]) {
+    PendingCommand.write(payload)
+    NotificationCenter.default.post(
+      name: CarPlaySceneDelegate.commandNotification,
+      object: nil,
+      userInfo: payload
+    )
+  }
+
+  // MARK: - Presets
+
+  private static func loadPresets() -> [Preset] {
+    guard
+      let json = UserDefaults.standard.string(forKey: "carPlayPresets"),
+      let data = json.data(using: .utf8),
+      let presets = try? JSONDecoder().decode([Preset].self, from: data),
+      !presets.isEmpty
+    else {
+      // The app has not run since install, so nothing has been published yet. Names alone are
+      // still enough to drive with.
+      return LightPresetOption.allCases.map {
+        Preset(id: $0.rawValue, name: $0.displayName, area1: "#FFFFFF", area2: "#FFFFFF")
+      }
+    }
+
+    return presets
+  }
+
+  /// The preset's two colours side by side, so a tile is recognisable without reading it.
+  private static func swatch(_ preset: Preset) -> UIImage {
+    let size = CGSize(width: 60, height: 60)
+    let renderer = UIGraphicsImageRenderer(size: size)
+
+    return renderer.image { context in
+      let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 13)
+      path.addClip()
+
+      color(preset.area1).setFill()
+      context.fill(CGRect(x: 0, y: 0, width: size.width / 2, height: size.height))
+      color(preset.area2).setFill()
+      context.fill(CGRect(x: size.width / 2, y: 0, width: size.width / 2, height: size.height))
+    }
+  }
+
+  private static func color(_ hex: String) -> UIColor {
+    var value: UInt64 = 0
+    Scanner(string: hex.replacingOccurrences(of: "#", with: "")).scanHexInt64(&value)
+
+    return UIColor(
+      red: CGFloat((value >> 16) & 0xFF) / 255,
+      green: CGFloat((value >> 8) & 0xFF) / 255,
+      blue: CGFloat(value & 0xFF) / 255,
+      alpha: 1
+    )
   }
 }

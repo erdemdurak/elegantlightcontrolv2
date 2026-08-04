@@ -43,7 +43,12 @@ import type {
 } from "./src/types";
 import { computeEffectRgb, frameIntervalMs, isAnimatedMode } from "./src/ble/effectEngine";
 import { startKeepAlive, stopKeepAlive } from "./src/ble/backgroundKeepAlive";
-import { consumeSiriCommand, onCarPlayCommand, type SiriCommand } from "./src/ble/siriCommands";
+import {
+  consumeSiriCommand,
+  onCarPlayCommand,
+  publishPresets,
+  type SiriCommand,
+} from "./src/ble/siriCommands";
 import { hexToHsv, hsvToHex, vibrantSaturation } from "./src/utils/color";
 import { InteriorPreview } from "./src/components/InteriorPreview";
 import {
@@ -60,7 +65,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v57 · carplay icon";
+const BUILD_LABEL = "v2 · lenze-v58 · carplay grid";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -815,6 +820,18 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [device, area1, area2, getBle],
   );
+
+  // Keep the CarPlay screen's tiles in step with the presets defined here.
+  useEffect(() => {
+    publishPresets(
+      BUILT_IN_THEMES.map((theme) => ({
+        id: theme.id,
+        name: theme.name,
+        area1: theme.area1.hex,
+        area2: theme.area2.hex,
+      })),
+    );
+  }, []);
 
   // Drain whatever Siri left behind, on launch and every time the app comes forward.
   useEffect(() => {
