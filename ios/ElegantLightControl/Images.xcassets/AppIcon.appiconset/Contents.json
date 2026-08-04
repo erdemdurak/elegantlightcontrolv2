@@ -1,14 +1,26 @@
 {
-  "images" : [
+  "images": [
     {
-      "filename" : "icon-1024.png",
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "filename": "icon-1024.png",
+      "idiom": "universal",
+      "platform": "ios",
+      "size": "1024x1024"
+    },
+    {
+      "idiom": "car",
+      "size": "60x60",
+      "scale": "2x",
+      "filename": "carplay-2x.png"
+    },
+    {
+      "idiom": "car",
+      "size": "60x60",
+      "scale": "3x",
+      "filename": "carplay-3x.png"
     }
   ],
-  "info" : {
-    "author" : "xcode",
-    "version" : 1
+  "info": {
+    "author": "xcode",
+    "version": 1
   }
 }

@@ -68,6 +68,8 @@ export type AppStateSnapshot = {
   activeTarget?: ControlTarget;
   /** Apply a profile automatically on connect, chosen by the clock. */
   autoDayNight?: boolean;
+  /** Minutes between automatic preset changes, or null when not rotating. */
+  rotateMinutes?: number | null;
   /** Three slots, applied on connect by the clock. */
   schedule?: ScheduleSlot[];
   /** Superseded by `schedule`; still read once so older saves migrate. */

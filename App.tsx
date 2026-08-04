@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v53 · app restored";
+const BUILD_LABEL = "v2 · lenze-v57 · carplay icon";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -153,6 +153,9 @@ const defaultArea2: LightSettings = {
   hue: 10,
   gradientColors: ["#FF6A00", "#FFCC00", "#00C8FF"],
 };
+
+/** Slider positions for preset rotation. Index 0 is off; the rest are minutes. */
+const ROTATE_STEPS: Array<number | null> = [null, 1, 5, 10, 15, 30];
 
 const MAX_GRADIENT_COLORS = 6;
 
@@ -308,6 +311,7 @@ export default function App() {
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
   const [backgroundEffects, setBackgroundEffects] = useState(true);
   const [autoDayNight, setAutoDayNight] = useState(false);
+  const [rotateMinutes, setRotateMinutes] = useState<number | null>(null);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(defaultSchedule);
   /** Bumped whenever CarPlay is seen active, to re-trigger the reconnect effect. */
   const [carPlayTick, setCarPlayTick] = useState(0);
@@ -404,6 +408,10 @@ export default function App() {
             setActiveTarget(parsed.activeTarget);
           }
 
+          if (parsed.rotateMinutes === null || typeof parsed.rotateMinutes === "number") {
+            setRotateMinutes(parsed.rotateMinutes);
+          }
+
           if (typeof parsed.backgroundEffects === "boolean") {
             setBackgroundEffects(parsed.backgroundEffects);
           }
@@ -467,6 +475,7 @@ export default function App() {
         activeTarget,
         backgroundEffects,
         autoDayNight,
+        rotateMinutes,
         schedule,
       };
       void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -483,6 +492,7 @@ export default function App() {
     activeTarget,
     backgroundEffects,
     autoDayNight,
+    rotateMinutes,
     schedule,
     hydrated,
   ]);
@@ -691,6 +701,9 @@ export default function App() {
 
   // The animation loop reads settings through a ref so that changing a colour mid-effect
   // does not tear down and restart the loop.
+  const activeThemeIdRef = useRef(activeThemeId);
+  activeThemeIdRef.current = activeThemeId;
+
   const settingsRef = useRef({ area1, area2 });
   settingsRef.current = { area1, area2 };
 
@@ -950,10 +963,34 @@ export default function App() {
     return () => subscription.remove();
   }, []);
 
+  /**
+   * Step through the presets on a timer.
+   *
+   * Runs off the app's own clock, so it only ticks while the app is alive — foregrounded, or
+   * backgrounded with the keepalive holding it up. A suspended app does not rotate, and that
+   * is why the keepalive below counts rotation as work worth staying awake for.
+   */
+  useEffect(() => {
+    if (!device || !rotateMinutes) {
+      return;
+    }
+
+    const handle = setInterval(() => {
+      const current = BUILT_IN_THEMES.findIndex((theme) => theme.id === activeThemeIdRef.current);
+      const next = BUILT_IN_THEMES[(current + 1) % BUILT_IN_THEMES.length];
+      handleApplyTheme(next);
+    }, rotateMinutes * 60_000);
+
+    return () => clearInterval(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [device, rotateMinutes]);
+
   // Hold the audio session only while the phone is actually computing frames. The app never
   // sleeping costs real battery, so a static colour or a chip-side breathe must not pay it.
   const needsKeepAlive =
-    backgroundEffects && Boolean(device) && (isPhoneDrivenMode(area1) || isPhoneDrivenMode(area2));
+    backgroundEffects &&
+    Boolean(device) &&
+    (isPhoneDrivenMode(area1) || isPhoneDrivenMode(area2) || Boolean(rotateMinutes));
 
   useEffect(() => {
     if (!needsKeepAlive) {
@@ -2188,6 +2225,25 @@ export default function App() {
           </View>
 
           {[...schedule].sort((a, b) => a.startHour - b.startHour).map(renderSlot)}
+
+          <Text style={styles.sectionSubtitle}>
+            Rotate presets: {rotateMinutes ? `every ${rotateMinutes} min` : "off"}
+          </Text>
+          <Slider
+            minimumValue={0}
+            maximumValue={ROTATE_STEPS.length - 1}
+            step={1}
+            value={Math.max(0, ROTATE_STEPS.indexOf(rotateMinutes))}
+            minimumTrackTintColor="#45f0b6"
+            maximumTrackTintColor="#425461"
+            onSlidingComplete={(value) => setRotateMinutes(ROTATE_STEPS[Math.round(value)])}
+          />
+          <Text style={styles.helperText}>
+            Steps through all {BUILT_IN_THEMES.length} presets in order, changing on the chosen
+            interval. It runs off the app's own clock, so it only advances while the app is
+            open — or in the background, if “Gradient in background” is on, which keeps the app
+            awake for this too. It overrides the interval above once it starts.
+          </Text>
         </View>
 
         <View style={styles.card}>
