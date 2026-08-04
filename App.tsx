@@ -43,7 +43,7 @@ import type {
 } from "./src/types";
 import { computeEffectRgb, frameIntervalMs, isAnimatedMode } from "./src/ble/effectEngine";
 import { startKeepAlive, stopKeepAlive } from "./src/ble/backgroundKeepAlive";
-import { consumeSiriCommand, type SiriCommand } from "./src/ble/siriCommands";
+import { consumeSiriCommand, onCarPlayCommand, type SiriCommand } from "./src/ble/siriCommands";
 import { hexToHsv, hsvToHex, vibrantSaturation } from "./src/utils/color";
 import { InteriorPreview } from "./src/components/InteriorPreview";
 import {
@@ -60,7 +60,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v50 · chip speed · siri phrases";
+const BUILD_LABEL = "v2 · lenze-v51 · CARPLAY";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -819,8 +819,13 @@ export default function App() {
         drain();
       }
     });
+    // CarPlay taps arrive while the app is backgrounded, where no foreground event ever comes.
+    const carPlay = onCarPlayCommand(drain);
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      carPlay();
+    };
   }, [runSiriCommand]);
 
   // Reconnect on our own to the controller last used. Without this a Siri command opens the

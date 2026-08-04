@@ -160,6 +160,28 @@ enum LightPresetOption: String, AppEnum {
     .bloom: "Bloom",
     .alpine: "Alpine",
   ]
+
+  /// Plain text for the CarPlay list. `caseDisplayRepresentations` holds LocalizedStringResource,
+  /// which is awkward to render into a CPListItem, and this keeps one list rather than a copy.
+  var displayName: String {
+    switch self {
+    case .burmester: return "Burmester"
+    case .amg: return "AMG"
+    case .nightDrive: return "Night Drive"
+    case .ice: return "Ice"
+    case .sunset: return "Sunset"
+    case .lounge: return "Lounge"
+    case .copper: return "Copper"
+    case .emerald: return "Emerald"
+    case .nightshade: return "Nightshade"
+    case .dusk: return "Dusk"
+    case .ultraviolet: return "Ultraviolet"
+    case .dune: return "Dune"
+    case .meadow: return "Meadow"
+    case .bloom: return "Bloom"
+    case .alpine: return "Alpine"
+    }
+  }
 }
 
 @available(iOS 16.0, *)

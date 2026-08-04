@@ -1,4 +1,4 @@
-import { NativeModules } from "react-native";
+import { NativeEventEmitter, NativeModules } from "react-native";
 
 /**
  * Commands handed over by the App Intents in ios/ElegantLightControl/AmbientIntents.swift.
@@ -38,4 +38,23 @@ export async function consumeSiriCommand(): Promise<SiriCommand | null> {
     // A malformed blob must never stop the app starting — it has already been cleared.
     return null;
   }
+}
+
+/**
+ * Fires when a CarPlay row is tapped. The command itself still comes from
+ * `consumeSiriCommand` — this only says "there is one waiting, now".
+ *
+ * CarPlay can leave the app in the background indefinitely, so waiting for a foreground event
+ * to drain the queue would mean the lights changed minutes later, or not at all.
+ */
+export function onCarPlayCommand(listener: () => void): () => void {
+  const native = NativeModules.CarPlayBridge;
+  if (!native) {
+    return () => undefined;
+  }
+
+  const emitter = new NativeEventEmitter(native);
+  const subscription = emitter.addListener("carPlayCommand", listener);
+
+  return () => subscription.remove();
 }

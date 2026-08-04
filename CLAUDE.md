@@ -179,16 +179,19 @@ not been transferred to `AndroidManifest.xml` yet. Do that when Android is actua
 
 ## Task backlog
 
-### Task 1 — Apple CarPlay support — **mostly done, 2026-08-01**
+### Task 1 — Apple CarPlay support — **DONE, 2026-08-04**
 
-**A full CarPlay app is not attainable.** The entitlement is granted only for fixed categories
-(audio, communication, navigation, EV charging, parking, fueling, quick food ordering, driving
-task, automaker) and a lighting accessory fits none. It is not a code limitation that can be
-worked around: the entitlement must be in the **provisioning profile**, which Apple's servers
-generate from capabilities enabled on the App ID, and iOS validates it. Not publishing does not
-help — Apple's criteria expect a distributed app. Adding
-`com.apple.developer.carplay-maps` to the entitlements file by hand works **in the Xcode
-simulator only** and never reaches real head-unit hardware.
+**Apple granted the CarPlay Driving Task entitlement on 2026-08-04.** The earlier analysis in
+this file said a full CarPlay app was unattainable for a lighting accessory. That was wrong —
+the request was submitted anyway because it cost nothing, and it was approved.
+
+The entitlement lives in the **provisioning profile**, not the project, so a grant alone
+changes nothing. Three things were needed: Apple assigning it to the team, the capability being
+enabled on the App ID `com.ambientlightcontroller.mobile`, and the profile regenerated. Only
+then does `com.apple.developer.carplay-driving-task` survive into the signed binary.
+
+Driving Task allows CPListTemplate, CPGridTemplate, CPInformationTemplate, CPTabBarTemplate,
+CPAlertTemplate and CPActionSheetTemplate, to a depth of five.
 
 **Siri via App Intents is the route, and it works.** Confirmed in the car 2026-08-01.
 
@@ -215,10 +218,14 @@ Two things Apple changed that the old plan missed:
       foregrounding actually annoy you in practice".
 - [x] **1d. Shortcuts automation** — CarPlay-connect automation opens the app, which then
       applies the day or night profile by itself.
-- [~] **1e. Driving-task entitlement request** — **submitted 2026-08-01**, awaiting Apple.
-      Reply comes by email; there is no status page. See `docs/carplay-entitlement-request.md`
-      for what was sent and what to do if it is granted. Expect a decline: the app is not
-      distributed, which Apple's criteria expect. Nothing depends on the outcome.
+- [x] **1e. Driving-task entitlement request** — **GRANTED 2026-08-04**, against my own
+      estimate that it would be declined. See `docs/carplay-entitlement-request.md`.
+- [x] **1f. CarPlay app.** `CarPlaySceneDelegate.swift` — a CPListTemplate of the presets plus
+      power, one tap each. Handover reuses the Siri UserDefaults path, plus a live event via
+      `CarPlayBridge.m` because CarPlay can leave the app backgrounded indefinitely. The scene
+      manifest declares **only** the CarPlay role: adding a window-scene role would move the
+      app onto the scene lifecycle while this AppDelegate still creates its own UIWindow, which
+      launches to a black screen.
 
 ### Task 2 — Gradient tests
 
