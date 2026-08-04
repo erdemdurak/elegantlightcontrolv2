@@ -84,10 +84,10 @@ export const BUILT_IN_THEMES: Theme[] = [
   },
   {
     id: "emerald",
-    name: "Emerald",
-    area1: { hex: "#00FF55", brightness: 60 },
-    area2: { hex: "#1ABA57", brightness: 70 },
-    hint: "Bright green doors, deeper green vents",
+    name: "Fern",
+    area1: { hex: "#5BFF81", brightness: 60 },
+    area2: { hex: "#1ABA57", brightness: 75 },
+    hint: "Soft green doors over a deeper green on the vents",
   },
   {
     id: "nightshade",

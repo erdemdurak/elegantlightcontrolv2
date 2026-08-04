@@ -151,7 +151,7 @@ enum LightPresetOption: String, AppEnum {
     .sunset: "Sunset",
     .lounge: "Lounge",
     .copper: "Copper",
-    .emerald: "Emerald",
+    .emerald: "Fern",
     .nightshade: "Nightshade",
     .dusk: "Dusk",
     .ultraviolet: "Ultraviolet",
@@ -172,7 +172,7 @@ enum LightPresetOption: String, AppEnum {
     case .sunset: return "Sunset"
     case .lounge: return "Lounge"
     case .copper: return "Copper"
-    case .emerald: return "Emerald"
+    case .emerald: return "Fern"
     case .nightshade: return "Nightshade"
     case .dusk: return "Dusk"
     case .ultraviolet: return "Ultraviolet"

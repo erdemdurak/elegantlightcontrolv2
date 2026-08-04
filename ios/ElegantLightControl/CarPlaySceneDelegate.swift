@@ -21,9 +21,6 @@ import UIKit
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   static let commandNotification = Notification.Name("ElegantLightCarPlayCommand")
 
-  /// Grid templates are capped at eight buttons by CarPlay.
-  private static let gridLimit = 8
-
   private var interfaceController: CPInterfaceController?
 
   private struct Preset: Decodable {
@@ -51,31 +48,38 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   // MARK: - Templates
 
   private func makeRootTemplate() -> CPTemplate {
-    let presets = Self.loadPresets()
-    let favourites = Array(presets.prefix(Self.gridLimit))
-
-    let grid = CPGridTemplate(
-      title: "Presets",
-      gridButtons: favourites.map { preset in
-        CPGridButton(
-          titleVariants: [preset.name],
-          image: Self.swatch(preset)
-        ) { [weak self] _ in
-          self?.send(["type": "preset", "value": preset.id])
-        }
+    // A list rather than a grid, because CarPlay renders CPGridButton artwork as a *template*
+    // — it tints it flat, so two-tone swatches came out monochrome and the tiles were
+    // distinguishable only by name. CPListItem images are drawn as-is, which is how audio apps
+    // show album art, so the real colours survive here.
+    let rows = Self.loadPresets().map { preset in
+      let item = CPListItem(
+        text: preset.name,
+        detailText: "\(preset.area1)   \(preset.area2)",
+        image: Self.swatch(preset)
+      )
+      item.handler = { _, completion in
+        Self.dispatch(["type": "preset", "value": preset.id])
+        completion()
       }
-    )
-    grid.tabTitle = "Presets"
-    grid.tabImage = UIImage(systemName: "square.grid.2x2")
+      return item
+    }
 
-    let control = CPListTemplate(title: "Control", sections: Self.controlSections(rest: Array(presets.dropFirst(Self.gridLimit)), delegate: self))
+    let presets = CPListTemplate(
+      title: "Presets",
+      sections: [CPListSection(items: rows, header: nil, sectionIndexTitle: nil)]
+    )
+    presets.tabTitle = "Presets"
+    presets.tabImage = UIImage(systemName: "paintpalette")
+
+    let control = CPListTemplate(title: "Control", sections: Self.controlSections())
     control.tabTitle = "Control"
     control.tabImage = UIImage(systemName: "slider.horizontal.3")
 
-    return CPTabBarTemplate(templates: [grid, control])
+    return CPTabBarTemplate(templates: [presets, control])
   }
 
-  private static func controlSections(rest: [Preset], delegate: CarPlaySceneDelegate) -> [CPListSection] {
+  private static func controlSections() -> [CPListSection] {
     let brightness = [
       ("Dim", "20"),
       ("Half", "50"),
@@ -89,19 +93,10 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
       row(title: "Lights Off") { ["type": "power", "value": "off"] },
     ]
 
-    var sections = [
+    return [
       CPListSection(items: brightness, header: "Brightness", sectionIndexTitle: nil),
       CPListSection(items: power, header: "Power", sectionIndexTitle: nil),
     ]
-
-    if !rest.isEmpty {
-      let more = rest.map { preset in
-        row(title: preset.name) { ["type": "preset", "value": preset.id] }
-      }
-      sections.append(CPListSection(items: more, header: "More presets", sectionIndexTitle: nil))
-    }
-
-    return sections
   }
 
   /// A row that fires and completes at once — a driver should never be left mid-interaction.
@@ -115,10 +110,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
       completion()
     }
     return item
-  }
-
-  private func send(_ payload: [String: String]) {
-    Self.dispatch(payload)
   }
 
   private static func dispatch(_ payload: [String: String]) {
@@ -149,13 +140,13 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     return presets
   }
 
-  /// The preset's two colours side by side, so a tile is recognisable without reading it.
+  /// The preset's two colours side by side, so a row is recognisable without reading it.
   private static func swatch(_ preset: Preset) -> UIImage {
-    let size = CGSize(width: 60, height: 60)
+    let size = CGSize(width: 44, height: 44)
     let renderer = UIGraphicsImageRenderer(size: size)
 
     return renderer.image { context in
-      let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 13)
+      let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 10)
       path.addClip()
 
       color(preset.area1).setFill()
