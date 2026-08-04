@@ -140,19 +140,51 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     return presets
   }
 
-  /// The preset's two colours side by side, so a row is recognisable without reading it.
+  /**
+   The cabin, drawn small, with the preset's colours where they actually fall.
+
+   CarPlay caps list images at 44 points. A photograph of the interior at that size is an
+   unreadable smudge, so this is a stylised version instead: two vent rings across the top in
+   the Area 2 colour, and the door line sweeping below them in Area 1. It carries the same
+   information as the photo — which colour lands where — at a size that still reads.
+   */
   private static func swatch(_ preset: Preset) -> UIImage {
     let size = CGSize(width: 44, height: 44)
     let renderer = UIGraphicsImageRenderer(size: size)
 
     return renderer.image { context in
-      let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 10)
-      path.addClip()
+      let cgContext = context.cgContext
+      UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 10).addClip()
 
-      color(preset.area1).setFill()
-      context.fill(CGRect(x: 0, y: 0, width: size.width / 2, height: size.height))
-      color(preset.area2).setFill()
-      context.fill(CGRect(x: size.width / 2, y: 0, width: size.width / 2, height: size.height))
+      // Cabin dark, so the light colours read as light rather than as fill.
+      UIColor(red: 0.04, green: 0.05, blue: 0.09, alpha: 1).setFill()
+      cgContext.fill(CGRect(origin: .zero, size: size))
+
+      let vents = color(preset.area2)
+      let doors = color(preset.area1)
+
+      // Two turbine vents, upper third.
+      vents.setStroke()
+      for centre in [CGPoint(x: 14, y: 15), CGPoint(x: 30, y: 15)] {
+        let ring = UIBezierPath(
+          arcCenter: centre, radius: 5, startAngle: 0, endAngle: .pi * 2, clockwise: true
+        )
+        ring.lineWidth = 2.5
+        ring.stroke()
+      }
+
+      // The door line, sweeping across the lower half the way the fibre run does.
+      let line = UIBezierPath()
+      line.move(to: CGPoint(x: 4, y: 33))
+      line.addCurve(
+        to: CGPoint(x: 40, y: 33),
+        controlPoint1: CGPoint(x: 16, y: 26),
+        controlPoint2: CGPoint(x: 28, y: 26)
+      )
+      line.lineWidth = 3
+      line.lineCapStyle = .round
+      doors.setStroke()
+      line.stroke()
     }
   }
 
