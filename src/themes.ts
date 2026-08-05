@@ -127,9 +127,9 @@ export const BUILT_IN_THEMES: Theme[] = [
   {
     id: "bloom",
     name: "Bloom",
-    area1: { hex: "#EB4393", brightness: 60 },
-    area2: { hex: "#00BBFF", brightness: 80 },
-    hint: "Rose doors, sky vents — the lightest pair, both softened rather than neon",
+    area1: { hex: "#FF00AA", brightness: 75 },
+    area2: { hex: "#70DAFF", brightness: 80 },
+    hint: "Hot pink doors, pale sky vents — the widest split between a vivid half and a soft one",
   },
   {
     id: "alpine",
