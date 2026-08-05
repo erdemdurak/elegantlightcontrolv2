@@ -65,7 +65,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v60 · carplay cabin rows";
+const BUILD_LABEL = "v2 · lenze-v61 · carplay wake fix";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -980,23 +980,31 @@ export default function App() {
     return () => subscription.remove();
   }, []);
 
+  // Refreshed every render, so the interval below always runs the current closure.
+  const rotateRef = useRef(() => {});
+  rotateRef.current = () => {
+    const current = BUILT_IN_THEMES.findIndex((theme) => theme.id === activeThemeIdRef.current);
+    handleApplyTheme(BUILT_IN_THEMES[(current + 1) % BUILT_IN_THEMES.length]);
+  };
+
   /**
    * Step through the presets on a timer.
    *
    * Runs off the app's own clock, so it only ticks while the app is alive — foregrounded, or
    * backgrounded with the keepalive holding it up. A suspended app does not rotate, and that
    * is why the keepalive below counts rotation as work worth staying awake for.
+   *
+   * The tick goes through a ref because the interval is created once and would otherwise keep
+   * calling the closure from the render that made it. That closure captured `canAddressAreas`,
+   * which is false until the profile locks in — so rotation could spend its whole life
+   * broadcasting Area 1's colour to both strips instead of addressing them separately.
    */
   useEffect(() => {
     if (!device || !rotateMinutes) {
       return;
     }
 
-    const handle = setInterval(() => {
-      const current = BUILT_IN_THEMES.findIndex((theme) => theme.id === activeThemeIdRef.current);
-      const next = BUILT_IN_THEMES[(current + 1) % BUILT_IN_THEMES.length];
-      handleApplyTheme(next);
-    }, rotateMinutes * 60_000);
+    const handle = setInterval(() => rotateRef.current(), rotateMinutes * 60_000);
 
     return () => clearInterval(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps

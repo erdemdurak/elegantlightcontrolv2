@@ -27,6 +27,10 @@ import Foundation
  */
 @objc(BackgroundKeepAlive)
 class BackgroundKeepAlive: NSObject {
+  /// React Native instantiates the module itself, and CarPlay needs to hold the *same* session,
+  /// so the player lives here rather than on whichever instance happens to exist.
+  static let shared = BackgroundKeepAlive()
+
   private var player: AVAudioPlayer?
   private var observing = false
 
@@ -35,6 +39,14 @@ class BackgroundKeepAlive: NSObject {
   }
 
   @objc func start() {
+    BackgroundKeepAlive.shared.begin()
+  }
+
+  @objc func stop() {
+    BackgroundKeepAlive.shared.end()
+  }
+
+  func begin() {
     guard player == nil else {
       return
     }
@@ -59,7 +71,7 @@ class BackgroundKeepAlive: NSObject {
     }
   }
 
-  @objc func stop() {
+  func end() {
     player?.stop()
     player = nil
 
@@ -115,8 +127,8 @@ class BackgroundKeepAlive: NSObject {
       return
     }
 
-    stop()
-    start()
+    end()
+    begin()
   }
 
   /// A one-second silent 8 kHz mono PCM WAV, built in memory so no audio file has to ship.
