@@ -147,7 +147,7 @@ enum LightPresetOption: String, AppEnum {
     .burmester: "Burmester",
     .amg: "AMG",
     .nightDrive: "Night Drive",
-    .ice: "Ice",
+    .ice: "Blush",
     .sunset: "Sunset",
     .lounge: "Lounge",
     .copper: "Copper",
@@ -168,7 +168,7 @@ enum LightPresetOption: String, AppEnum {
     case .burmester: return "Burmester"
     case .amg: return "AMG"
     case .nightDrive: return "Night Drive"
-    case .ice: return "Ice"
+    case .ice: return "Blush"
     case .sunset: return "Sunset"
     case .lounge: return "Lounge"
     case .copper: return "Copper"

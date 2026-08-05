@@ -56,10 +56,10 @@ export const BUILT_IN_THEMES: Theme[] = [
   },
   {
     id: "ice",
-    name: "Ice",
-    area1: { hex: "#DCEBFF", brightness: 60 },
-    area2: { hex: "#00D2FF", brightness: 85 },
-    hint: "Cool white doors, cyan vents — the coldest pair here",
+    name: "Blush",
+    area1: { hex: "#EB4393", brightness: 80 },
+    area2: { hex: "#70DAFF", brightness: 80 },
+    hint: "Soft rose doors, pale sky vents — Bloom with the pink taken down",
   },
   {
     id: "sunset",
