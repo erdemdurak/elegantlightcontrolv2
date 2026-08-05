@@ -65,7 +65,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v62 · bloom";
+const BUILD_LABEL = "v2 · lenze-v63 · preset selects both";
 
 /**
  * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
@@ -594,6 +594,9 @@ export default function App() {
   const applyPair = (next1: LightSettings, next2: LightSettings, what: string) => {
     setArea1(next1);
     setArea2(next2);
+    // Anything that writes both halves should leave both selected. Staying on a single area
+    // dimmed the other one in the preview, so a preset looked like it had only half applied.
+    setActiveTarget("both");
 
     if (!device) {
       setStatusMessage(`${what} set — connect to send it.`);
