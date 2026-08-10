@@ -48,6 +48,11 @@ import {
   publishPresets,
   type SiriCommand,
 } from "./src/ble/siriCommands";
+import {
+  publishDeviceId,
+  seedNativeState,
+  setNativeSuppressed,
+} from "./src/ble/nativeBle";
 import { hexToHsv, hsvToHex, vibrantSaturation } from "./src/utils/color";
 import { InteriorPreview } from "./src/components/InteriorPreview";
 import {
@@ -64,7 +69,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v67 · appstore";
+const BUILD_LABEL = "v2 · lenze-v71 · brightness-above-wheel";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -713,6 +718,10 @@ export default function App() {
   const settingsRef = useRef({ area1, area2 });
   settingsRef.current = { area1, area2 };
 
+  /** Read from the AppState listener, which is registered once and would capture a stale value. */
+  const deviceRef = useRef<Device | null>(null);
+  deviceRef.current = device;
+
   // Mirror the live colours into the protocol layer on every change, so a single-area send
   // always fills the other half with the truth rather than a stale default.
   useEffect(() => {
@@ -830,6 +839,8 @@ export default function App() {
         name: theme.name,
         area1: theme.area1.hex,
         area2: theme.area2.hex,
+        brightness1: theme.area1.brightness,
+        brightness2: theme.area2.brightness,
       })),
     );
   }, []);
@@ -980,6 +991,36 @@ export default function App() {
 
     return () => subscription.remove();
   }, []);
+
+  /**
+   * Hand the radio to the native writer whenever this app is not in front.
+   *
+   * A backgrounded app can be suspended at any moment, and a suspended app cannot answer a
+   * CarPlay tap — that is the whole reason AmbientBle exists. Reclaiming on foreground keeps
+   * the two from ever writing at once.
+   */
+  useEffect(() => {
+    const claim = (active: boolean) => setNativeSuppressed(active && Boolean(deviceRef.current));
+
+    claim(AppState.currentState === "active");
+    const subscription = AppState.addEventListener("change", (state) => claim(state === "active"));
+
+    return () => {
+      subscription.remove();
+      // Unmounting means no JS is driving anything.
+      setNativeSuppressed(false);
+    };
+  }, []);
+
+  /**
+   * Keep the native writer's idea of the cabin in step with ours.
+   *
+   * Its memory starts at white/100%, and every frame carries both areas — so without this the
+   * first CarPlay tap after a cold start would reset whichever area it did not touch.
+   */
+  useEffect(() => {
+    seedNativeState(area1Color, area2Color, area1.brightness, area2.brightness);
+  }, [area1Color, area2Color, area1.brightness, area2.brightness]);
 
   // Refreshed every render, so the interval below always runs the current closure.
   const rotateRef = useRef(() => {});
@@ -1153,6 +1194,12 @@ export default function App() {
       // so editing one does not blank the other.
       ble.seedAreaColors(settingsRef.current.area1, settingsRef.current.area2);
 
+      // JS now owns the radio: two CoreBluetooth centrals writing at once would interleave
+      // frames, and every Lenze frame carries both areas, so the half not being edited would
+      // visibly reset. Native stands down until we disconnect or go to the background.
+      setNativeSuppressed(true);
+      publishDeviceId(targetDevice.id);
+
       const plan = ble.buildSweepPlan();
       setSweepPlan(plan);
       setSweepIndex(-1);
@@ -1189,6 +1236,8 @@ export default function App() {
       setZonePlan([]);
       setZoneIndex(-1);
       setNotifyLog([]);
+      // Hand the radio back so a CarPlay tap still reaches the lights.
+      setNativeSuppressed(false);
       setStatusMessage("Disconnected.");
     }
   };
@@ -1961,6 +2010,23 @@ export default function App() {
             onSelectArea={setActiveTarget}
           />
 
+          {/* The same control as the one in Light Control, repeated here because brightness is
+              the thing most often wanted straight after tapping a preset, and Light Control is
+              several sections further down. It drives whichever area the chips above select. */}
+          <Text style={styles.sliderLabel}>
+            Brightness ({Math.round(activeSettings.brightness)}%) ·{" "}
+            {activeTarget === "area1" ? "doors" : activeTarget === "area2" ? "vents" : "both areas"}
+          </Text>
+          <Slider
+            minimumValue={0}
+            maximumValue={100}
+            value={activeSettings.brightness}
+            minimumTrackTintColor="#45f0b6"
+            maximumTrackTintColor="#425461"
+            onValueChange={(value) => applyToActive({ ...activeSettings, brightness: value })}
+            onSlidingComplete={(value) => applyAndSend({ ...activeSettings, brightness: value })}
+          />
+
           <View style={styles.grid}>
             {BUILT_IN_THEMES.map((theme) => {
               const selected = activeThemeId === theme.id;
@@ -2045,6 +2111,17 @@ export default function App() {
               </View>
             </View>
           </View>
+
+          <Text style={styles.sliderLabel}>Brightness ({Math.round(activeSettings.brightness)}%)</Text>
+          <Slider
+            minimumValue={0}
+            maximumValue={100}
+            value={activeSettings.brightness}
+            minimumTrackTintColor="#45f0b6"
+            maximumTrackTintColor="#425461"
+            onValueChange={(value) => applyToActive({ ...activeSettings, brightness: value })}
+            onSlidingComplete={(value) => applyAndSend({ ...activeSettings, brightness: value })}
+          />
 
           <View style={styles.wheelCard}>
             <View
@@ -2132,17 +2209,6 @@ export default function App() {
           <Text style={styles.helperText}>
             Built-in colours above the line, yours below. Long-press one of yours to remove it.
           </Text>
-
-          <Text style={styles.sliderLabel}>Brightness ({Math.round(activeSettings.brightness)}%)</Text>
-          <Slider
-            minimumValue={0}
-            maximumValue={100}
-            value={activeSettings.brightness}
-            minimumTrackTintColor="#45f0b6"
-            maximumTrackTintColor="#425461"
-            onValueChange={(value) => applyToActive({ ...activeSettings, brightness: value })}
-            onSlidingComplete={(value) => applyAndSend({ ...activeSettings, brightness: value })}
-          />
 
           <Text style={styles.sliderLabel}>Mode</Text>
           <Text style={styles.helperText}>

@@ -212,17 +212,21 @@ Two things Apple changed that the old plan missed:
       UserDefaults because Siri cold-launches the app. Note: **AppShortcut phrases accept only
       one parameter**, so area cannot be spoken, and an `Int` cannot appear in a phrase at all,
       which is why brightness is Shortcuts-only.
-- [ ] **1c. Native CoreBluetooth path** — **no longer optional.** It was the nice-to-have that
-      would let intents run without launching the app; it is now the only way to get back what
-      `UIBackgroundModes` → `audio` used to provide. That key was removed for the App Store
-      submission (guideline 2.5.4 forbids silent playback as a keep-alive), which cost two
-      things: gradient/strobe animating while backgrounded, and **CarPlay taps landing while
-      the phone is asleep** — the regression `b2aeaeb` originally fixed. A tap now writes to
-      UserDefaults and waits for something to resume the app.
-      The fix is to write the A5 frame from Swift over CoreBluetooth so no JS runtime is
-      needed: connect to the remembered peripheral, discover `FFB0`/`FFB1`, write 20 bytes.
-      Duplicates the frame builder and the theme table in Swift. See
-      `docs/app-store-submission.md`.
+- [x] **1c. Native CoreBluetooth path** — **done for CarPlay, 2026-08-11.** `LenzeFrame.swift`
+      ports the 55/AA frame builder (verified against every frame in the capture) and
+      `AmbientBle.swift` writes them over a `CBCentralManager` of its own, so a CarPlay tap
+      needs no JS runtime. Confirmed in the car: presets work with the phone locked.
+      Two things learned there. The controller ignores commands on a freshly-opened link
+      unless it gets the preamble first — presets carried one and worked, brightness did not
+      and was silently dropped, so the handshake now belongs to the connection. And React
+      Native instantiates its own copy of a bridge module, so every `@objc` method has to
+      forward to `shared` or it mutates an object nothing else can see.
+      **Still true:** gradient and strobe cannot animate while backgrounded, and rotation
+      cannot advance. Those need a timer while suspended, which `bluetooth-central` does not
+      provide. Only a background mode would, and the honest ones are unavailable to this app.
+      JS still owns the radio while the app is foregrounded; the two never write at once, see
+      `isSuppressed`.
+
 - [x] **1d. Shortcuts automation** — CarPlay-connect automation opens the app, which then
       applies the day or night profile by itself.
 - [x] **1e. Driving-task entitlement request** — **GRANTED 2026-08-04**, against my own

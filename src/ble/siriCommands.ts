@@ -67,7 +67,15 @@ export function onCarPlayCommand(listener: () => void): () => void {
  * truth and lets the car draw the real colours.
  */
 export function publishPresets(
-  presets: Array<{ id: string; name: string; area1: string; area2: string }>,
+  presets: Array<{
+    id: string;
+    name: string;
+    area1: string;
+    area2: string;
+    /** Per-area brightness, so the native writer can apply a preset in full — see AmbientBle. */
+    brightness1: number;
+    brightness2: number;
+  }>,
 ): void {
   const native = NativeModules.CarPlayBridge as { publishPresets?(json: string): void } | undefined;
   native?.publishPresets?.(JSON.stringify(presets));

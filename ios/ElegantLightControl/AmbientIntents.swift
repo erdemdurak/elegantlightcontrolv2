@@ -145,7 +145,7 @@ enum LightPresetOption: String, AppEnum {
   static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Preset")
   static var caseDisplayRepresentations: [LightPresetOption: DisplayRepresentation] = [
     .burmester: "Burmester",
-    .amg: "AMG",
+    .amg: "Sport",
     .nightDrive: "Night Drive",
     .ice: "Blush",
     .sunset: "Sunset",
@@ -166,7 +166,7 @@ enum LightPresetOption: String, AppEnum {
   var displayName: String {
     switch self {
     case .burmester: return "Burmester"
-    case .amg: return "AMG"
+    case .amg: return "Sport"
     case .nightDrive: return "Night Drive"
     case .ice: return "Blush"
     case .sunset: return "Sunset"

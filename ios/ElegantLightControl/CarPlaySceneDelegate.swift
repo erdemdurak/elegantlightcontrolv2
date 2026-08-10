@@ -121,13 +121,45 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     return item
   }
 
+  /**
+   Apply the tap natively, and tell JS about it too.
+
+   The native write is what makes a tap work with the phone asleep — it needs no JS runtime.
+   The UserDefaults command and the notification are still posted so that a *running* app
+   updates its UI to match; AmbientBle drops the frames in that case rather than writing them
+   twice. See `isSuppressed` there.
+   */
   private static func dispatch(_ payload: [String: String]) {
+    applyNatively(payload)
+
     PendingCommand.write(payload)
     NotificationCenter.default.post(
       name: CarPlaySceneDelegate.commandNotification,
       object: nil,
       userInfo: payload
     )
+  }
+
+  private static func applyNatively(_ payload: [String: String]) {
+    guard let type = payload["type"] else {
+      return
+    }
+
+    switch type {
+    case "preset":
+      if let id = payload["value"] {
+        AmbientBle.shared.applyPreset(id: id)
+      }
+    case "brightness":
+      if let value = payload["value"], let percent = Int(value) {
+        // "both" is area 0 in the native API, matching how nil means both in LenzeState.
+        AmbientBle.shared.applyBrightness(percent, area: Int(payload["area"] ?? "") ?? 0)
+      }
+    case "power":
+      AmbientBle.shared.applyPower(on: payload["value"] != "off")
+    default:
+      NSLog("CarPlay: no native handler for \(type)")
+    }
   }
 
   // MARK: - Presets

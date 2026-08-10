@@ -16,8 +16,13 @@ import { hexToHsv } from "./utils/color";
  *   hues between roughly 80 and 110 degrees are used at all.
  * - Area 2 is vents and tweeter grilles — small, ringed in chrome, and the chrome throws the
  *   colour back at you. It carries the saturated half of every pair.
- * - Area 1 is the long door lines and the console. Run at the same intensity as the vents it
- *   dominates the mirror and the side glass, so it sits a step lower in almost every theme.
+ * - Area 1 is the long door lines and the console.
+ *
+ * Brightness is uniform across every theme: **85% on the doors, 70% on the vents**, set from
+ * the car rather than from theory. Earlier versions varied it per theme and ran area 1 lower
+ * on the reasoning that the long door lines dominate the mirror and side glass; in practice
+ * the chrome around the vents throws enough light back that the vents are the half that needs
+ * holding down. Change both numbers together, here, rather than per theme.
  *
  * Brightness is the dimmer, not the colour — see LightSettings.
  */
@@ -36,105 +41,105 @@ export const BUILT_IN_THEMES: Theme[] = [
   {
     id: "burmester",
     name: "Burmester",
-    area1: { hex: "#FFD8A8", brightness: 65 },
-    area2: { hex: "#FF8000", brightness: 85 },
-    hint: "Warm white doors, amber vents — matches the factory dash lighting",
+    area1: { hex: "#FF8D00", brightness: 85 },
+    area2: { hex: "#FF8000", brightness: 70 },
+    hint: "Amber throughout, doors a shade lighter — matches the factory dash lighting",
   },
   {
     id: "amg",
-    name: "AMG",
-    area1: { hex: "#FFC400", brightness: 70 },
-    area2: { hex: "#5CFDFF", brightness: 85 },
-    hint: "Amber doors, cyan vents — the AMG cluster's own yellow and blue",
+    name: "Sport",
+    area1: { hex: "#FFC400", brightness: 85 },
+    area2: { hex: "#0491FF", brightness: 70 },
+    hint: "Amber doors, azure vents — the cluster's own yellow and blue",
   },
   {
     id: "night-drive",
     name: "Night Drive",
-    area1: { hex: "#000FFF", brightness: 60 },
-    area2: { hex: "#1500FF", brightness: 80 },
+    area1: { hex: "#000FFF", brightness: 85 },
+    area2: { hex: "#1500FF", brightness: 70 },
     hint: "The signature Mercedes blue, deepest on the doors",
   },
   {
     id: "ice",
     name: "Blush",
-    area1: { hex: "#EB4393", brightness: 80 },
-    area2: { hex: "#70DAFF", brightness: 80 },
+    area1: { hex: "#EB4393", brightness: 85 },
+    area2: { hex: "#70DAFF", brightness: 70 },
     hint: "Soft rose doors, pale sky vents — Bloom with the pink taken down",
   },
   {
     id: "sunset",
     name: "Sunset",
-    area1: { hex: "#FF0066", brightness: 65 },
-    area2: { hex: "#FF5300", brightness: 80 },
+    area1: { hex: "#FF0066", brightness: 85 },
+    area2: { hex: "#FF5300", brightness: 70 },
     hint: "Rose doors into amber vents",
   },
   {
     id: "lounge",
     name: "Mint",
-    area1: { hex: "#18EAD6", brightness: 90 },
-    area2: { hex: "#70DAFF", brightness: 80 },
+    area1: { hex: "#18EAD6", brightness: 85 },
+    area2: { hex: "#70DAFF", brightness: 70 },
     hint: "Turquoise doors, pale sky vents — the coolest pair here",
   },
   {
     id: "copper",
     name: "Copper",
-    area1: { hex: "#FF5500", brightness: 60 },
-    area2: { hex: "#FF2100", brightness: 80 },
+    area1: { hex: "#FF5500", brightness: 85 },
+    area2: { hex: "#FF2100", brightness: 70 },
     hint: "Ember doors, gold vents — warmest, best with the chrome trim",
   },
   {
     id: "emerald",
     name: "Fern",
-    area1: { hex: "#5BFF81", brightness: 60 },
-    area2: { hex: "#1ABA57", brightness: 75 },
+    area1: { hex: "#5BFF81", brightness: 85 },
+    area2: { hex: "#1ABA57", brightness: 70 },
     hint: "Soft green doors over a deeper green on the vents",
   },
   {
     id: "nightshade",
     name: "Nightshade",
-    area1: { hex: "#8000FF", brightness: 60 },
-    area2: { hex: "#0000FF", brightness: 75 },
+    area1: { hex: "#8000FF", brightness: 85 },
+    area2: { hex: "#0000FF", brightness: 70 },
     hint: "Violet doors, deep blue vents — pure blue reads darkest of any hue on the strip",
   },
   {
     id: "dusk",
     name: "Dusk",
-    area1: { hex: "#FFBB70", brightness: 100 },
-    area2: { hex: "#7500FF", brightness: 100 },
-    hint: "Warm sand doors against violet vents, both at full — the loudest pair here",
+    area1: { hex: "#FFBB70", brightness: 85 },
+    area2: { hex: "#8532FF", brightness: 70 },
+    hint: "Warm sand doors against violet vents — the loudest pair here",
   },
   {
     id: "ultraviolet",
     name: "Ultraviolet",
-    area1: { hex: "#4000FF", brightness: 55 },
-    area2: { hex: "#BF00FF", brightness: 80 },
+    area1: { hex: "#4000FF", brightness: 85 },
+    area2: { hex: "#BF00FF", brightness: 70 },
     hint: "Indigo doors, magenta vents — the two ends of violet against each other",
   },
   {
     id: "dune",
     name: "Dune",
-    area1: { hex: "#FFBB70", brightness: 80 },
-    area2: { hex: "#1ABA57", brightness: 80 },
+    area1: { hex: "#FFBB70", brightness: 85 },
+    area2: { hex: "#1ABA57", brightness: 70 },
     hint: "Warm sand doors, green vents",
   },
   {
     id: "meadow",
     name: "Meadow",
-    area1: { hex: "#00FFA3", brightness: 100 },
-    area2: { hex: "#00BA43", brightness: 100 },
-    hint: "Mint doors, deeper green vents — both at full, the brightest pair here",
+    area1: { hex: "#00FFA3", brightness: 85 },
+    area2: { hex: "#00BA43", brightness: 70 },
+    hint: "Mint doors, deeper green vents — the brightest pair here",
   },
   {
     id: "bloom",
     name: "Bloom",
-    area1: { hex: "#FF00AA", brightness: 75 },
-    area2: { hex: "#70DAFF", brightness: 80 },
+    area1: { hex: "#FF00AA", brightness: 85 },
+    area2: { hex: "#70DAFF", brightness: 70 },
     hint: "Hot pink doors, pale sky vents — the widest split between a vivid half and a soft one",
   },
   {
     id: "alpine",
     name: "Alpine",
-    area1: { hex: "#FFFFFF", brightness: 50 },
+    area1: { hex: "#FFFFFF", brightness: 85 },
     area2: { hex: "#FFFFFF", brightness: 70 },
     hint: "Plain white, held low so the leather keeps its grain",
   },

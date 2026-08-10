@@ -17,6 +17,9 @@
 		8790A7AB53ACF7A5FCE9578C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		AAE0C23FD31C4CFDFDD88817 /* BackgroundKeepAlive.m in Sources */ = {isa = PBXBuildFile; fileRef = 85931C298EE871847AC1A049 /* BackgroundKeepAlive.m */; };
 		AC269048375F830FD09E6955 /* CarPlayBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 870784AB7C8CBC9C339EBCFC /* CarPlayBridge.m */; };
+		AA01LENZEFRAME0000000001 /* LenzeFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02LENZEFRAME0000000002 /* LenzeFrame.swift */; };
+		AA01AMBIENTBLE0000000003 /* AmbientBle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02AMBIENTBLE0000000004 /* AmbientBle.swift */; };
+		AA01AMBIENTBRIDGE00000005 /* AmbientBleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = AA02AMBIENTBRIDGE00000006 /* AmbientBleBridge.m */; };
 		C8918AE81AC01ECF72E2EF83 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782B667BB4BB440473D82AA8 /* CarPlaySceneDelegate.swift */; };
 		C8AF704F0A5C07D7AE6899E0 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656841BBB3C969ACA55BAFA0 /* BackgroundKeepAlive.swift */; };
 		E51EDD90E94CB4B1AF16D981 /* SiriBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 6570C446627BA6C1B3016723 /* SiriBridge.m */; };
@@ -34,6 +37,9 @@
 		6570C446627BA6C1B3016723 /* SiriBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = SiriBridge.m; path = ElegantLightControl/SiriBridge.m; sourceTree = "<group>"; };
 		725EA2A1C0BAAFD44D8F289C /* ElegantLightControl.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = ElegantLightControl.entitlements; path = ElegantLightControl/ElegantLightControl.entitlements; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ElegantLightControl/AppDelegate.swift; sourceTree = "<group>"; };
+		AA02LENZEFRAME0000000002 /* LenzeFrame.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LenzeFrame.swift; path = ElegantLightControl/LenzeFrame.swift; sourceTree = "<group>"; };
+		AA02AMBIENTBLE0000000004 /* AmbientBle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AmbientBle.swift; path = ElegantLightControl/AmbientBle.swift; sourceTree = "<group>"; };
+		AA02AMBIENTBRIDGE00000006 /* AmbientBleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = AmbientBleBridge.m; path = ElegantLightControl/AmbientBleBridge.m; sourceTree = "<group>"; };
 		782B667BB4BB440473D82AA8 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CarPlaySceneDelegate.swift; path = ElegantLightControl/CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = ElegantLightControl/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		85931C298EE871847AC1A049 /* BackgroundKeepAlive.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = ElegantLightControl/BackgroundKeepAlive.m; sourceTree = "<group>"; };
@@ -69,6 +75,9 @@
 				E4F09B938E9ABC3221A221F3 /* AmbientIntents.swift */,
 				6570C446627BA6C1B3016723 /* SiriBridge.m */,
 				F5FFB0ACC7B04735321DB5A8 /* CarPlayStatus.m */,
+				AA02LENZEFRAME0000000002 /* LenzeFrame.swift */,
+				AA02AMBIENTBLE0000000004 /* AmbientBle.swift */,
+				AA02AMBIENTBRIDGE00000006 /* AmbientBleBridge.m */,
 				782B667BB4BB440473D82AA8 /* CarPlaySceneDelegate.swift */,
 				870784AB7C8CBC9C339EBCFC /* CarPlayBridge.m */,
 				725EA2A1C0BAAFD44D8F289C /* ElegantLightControl.entitlements */,
@@ -278,6 +287,9 @@
 				4D19727D9F3407850EEB7373 /* AmbientIntents.swift in Sources */,
 				E51EDD90E94CB4B1AF16D981 /* SiriBridge.m in Sources */,
 				385E56E02A0514A9022D40EC /* CarPlayStatus.m in Sources */,
+				AA01LENZEFRAME0000000001 /* LenzeFrame.swift in Sources */,
+				AA01AMBIENTBLE0000000003 /* AmbientBle.swift in Sources */,
+				AA01AMBIENTBRIDGE00000005 /* AmbientBleBridge.m in Sources */,
 				C8918AE81AC01ECF72E2EF83 /* CarPlaySceneDelegate.swift in Sources */,
 				AC269048375F830FD09E6955 /* CarPlayBridge.m in Sources */,
 				7E561ECA190E9569C608D06E /* SceneDelegate.swift in Sources */,
@@ -294,7 +306,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = ElegantLightControl/ElegantLightControl.entitlements;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = Y829B2QFT9;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = ElegantLightControl/Info.plist;
@@ -324,7 +336,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = ElegantLightControl/ElegantLightControl.entitlements;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = Y829B2QFT9;
 				INFOPLIST_FILE = ElegantLightControl/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
