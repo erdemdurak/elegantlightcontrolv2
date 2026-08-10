@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Used by `xcodebuild -exportArchive` to push a Release archive to TestFlight.
+	     See docs/app-store-submission.md for the full command, including the
+	     App Store Connect API key flags that authenticate the upload. -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>teamID</key>
+	<string>Y829B2QFT9</string>
+	<!-- Automatic signing, combined with -allowProvisioningUpdates, is what creates the
+	     Apple Distribution certificate and the App Store profile on first run. Neither
+	     exists yet; the only identity on this Mac is Apple Development. -->
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<!-- Upload straight from the export step rather than writing an .ipa and handing it to
+	     altool afterwards. One command, one authentication. -->
+	<key>destination</key>
+	<string>upload</string>
+	<!-- dSYMs go up with the build so TestFlight crash reports symbolicate. -->
+	<key>uploadSymbols</key>
+	<true/>
+	<!-- Bitcode is dead as of Xcode 14; leaving this true produces a warning on every run. -->
+	<key>uploadBitcode</key>
+	<false/>
+	<!-- Info.plist already answers this with ITSAppUsesNonExemptEncryption=false, so the
+	     compliance question never appears in App Store Connect. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

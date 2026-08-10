@@ -37,11 +37,14 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     self.interfaceController = interfaceController
     interfaceController.setRootTemplate(makeRootTemplate(), animated: false, completion: nil)
 
-    // Without this a tap did nothing until the phone was woken. CarPlay having a scene is not
-    // enough to keep the app out of suspension, and a suspended app has no JS runtime — so the
-    // command sat in UserDefaults until something happened to resume the app. Holding the
-    // silent audio session for as long as CarPlay is connected keeps JS alive to answer.
-    BackgroundKeepAlive.shared.begin()
+    // A known limitation, accepted deliberately: if iOS suspends the app, a tap here lands in
+    // UserDefaults and does nothing until something resumes the app. CarPlay having a scene is
+    // not enough to keep the app out of suspension, and a suspended app has no JS runtime.
+    //
+    // This used to be solved by holding a silent audio session for as long as CarPlay was
+    // connected. That needs `audio` in UIBackgroundModes, which App Store guideline 2.5.4
+    // forbids for this purpose. The correct fix is to write the frame from Swift over
+    // CoreBluetooth so no JS runtime is needed at all — Task 1c.
   }
 
   func templateApplicationScene(
@@ -49,7 +52,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didDisconnectInterfaceController interfaceController: CPInterfaceController
   ) {
     self.interfaceController = nil
-    BackgroundKeepAlive.shared.end()
   }
 
   // MARK: - Templates

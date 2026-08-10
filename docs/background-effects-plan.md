@@ -1,5 +1,12 @@
 # Keeping effects running with the app closed
 
+> **SUPERSEDED — the silent-audio approach described here has been removed.** It needs
+> `UIBackgroundModes` → `audio`, which App Store guideline 2.5.4 forbids for this purpose, so it
+> was taken out ahead of the 1.0 submission along with the *"Gradient in background"* toggle and
+> `src/ble/backgroundKeepAlive.ts`. The constraint below is still an accurate description of the
+> problem; only the solution is dead. The live plan is Task 1c — a native CoreBluetooth path.
+> See `docs/app-store-submission.md`.
+
 ## The constraint
 
 `effectEngine.ts` computes every animation frame on the phone and writes it over BLE at

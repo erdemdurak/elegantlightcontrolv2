@@ -37,8 +37,9 @@
 	<string>Allow Elegant Light Control to find and connect to your BLE ambient controller.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Allow Elegant Light Control to communicate with your BLE ambient controller.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<!-- No NSLocationWhenInUseUsageDescription: iOS BLE central needs no location permission,
+	     and an empty purpose string is rejected on submission. Android is where the location
+	     permission lives — see bleAmbientController.requestAndroidPermissions. -->
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
@@ -75,11 +76,16 @@
 	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
-		<!-- Silent playback keeps the app alive so phone-driven effects survive
-		     backgrounding. See BackgroundKeepAlive.swift. -->
-		<string>audio</string>
 		<!-- Lets BLE work while backgrounded, and lets iOS restore the connection. -->
 		<string>bluetooth-central</string>
+		<!-- No `audio`. It was here so BackgroundKeepAlive.swift could hold a silent audio
+		     session, which kept the JS runtime alive for phone-driven effects and for CarPlay
+		     taps while the phone slept. App Store guideline 2.5.4 forbids exactly that — using
+		     a background service for something other than its stated purpose — and silent
+		     playback to stay awake is the textbook case. Removing it costs backgrounded
+		     gradient/strobe, and costs CarPlay taps landing while the app is suspended. The
+		     real fix is a native CoreBluetooth path (Task 1c), not this key.
+		     See docs/app-store-submission.md. -->
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

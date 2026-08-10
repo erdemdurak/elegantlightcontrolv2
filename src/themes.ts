@@ -70,10 +70,10 @@ export const BUILT_IN_THEMES: Theme[] = [
   },
   {
     id: "lounge",
-    name: "Lounge",
-    area1: { hex: "#6600FF", brightness: 60 },
-    area2: { hex: "#00A6FF", brightness: 80 },
-    hint: "Violet doors, azure vents — strongest contrast of the eight",
+    name: "Mint",
+    area1: { hex: "#18EAD6", brightness: 90 },
+    area2: { hex: "#70DAFF", brightness: 80 },
+    hint: "Turquoise doors, pale sky vents — the coolest pair here",
   },
   {
     id: "copper",

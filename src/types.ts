@@ -55,11 +55,6 @@ export type AppStateSnapshot = {
    */
   lastDeviceId?: string | null;
   /**
-   * Whether phone-driven effects may hold the audio session to survive backgrounding. Off
-   * costs nothing; on is the only expensive thing this app does.
-   */
-  backgroundEffects?: boolean;
-  /**
    * Which preset chip is highlighted, and which area the controls are driving. Neither
    * changes the lights — the colours themselves are already in area1/area2 — but losing them
    * on every launch made a restored cabin look like it belonged to no preset at all.

@@ -42,7 +42,6 @@ import type {
   LockedProfile,
 } from "./src/types";
 import { computeEffectRgb, frameIntervalMs, isAnimatedMode } from "./src/ble/effectEngine";
-import { startKeepAlive, stopKeepAlive } from "./src/ble/backgroundKeepAlive";
 import {
   consumeSiriCommand,
   onCarPlayCommand,
@@ -65,13 +64,17 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v64 · blush";
+const BUILD_LABEL = "v2 · lenze-v67 · appstore";
 
 /**
- * Protocol Sweep, Command Lab and Diagnostics are identification tools — they were needed to
- * find the protocol, not to use the lights. Flip this to show them again.
+ * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
+ * needed to find the protocol, not to use the lights. They stay hidden in a release build: an
+ * App Store reviewer landing on a screen that writes arbitrary hex to a BLE device is a
+ * rejection waiting to happen.
+ *
+ * On in a dev build. In release, tap the build stamp this many times to bring them back.
  */
-const SHOW_DEV_TOOLS: boolean = false;
+const DEV_TOOLS_TAPS = 7;
 
 /**
  * Erdem's own palette, ordered around the wheel rather than as given so the grid reads as a
@@ -314,7 +317,6 @@ export default function App() {
   const [activeTarget, setActiveTarget] = useState<ControlTarget>("both");
   const [activeThemeId, setActiveThemeId] = useState<string | null>(null);
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
-  const [backgroundEffects, setBackgroundEffects] = useState(true);
   const [autoDayNight, setAutoDayNight] = useState(false);
   const [rotateMinutes, setRotateMinutes] = useState<number | null>(null);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(defaultSchedule);
@@ -338,6 +340,8 @@ export default function App() {
   const [gattEntries, setGattEntries] = useState<GattEntry[]>([]);
   const [notifyLog, setNotifyLog] = useState<string[]>([]);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [devToolsVisible, setDevToolsVisible] = useState(__DEV__);
+  const devTapsRef = useRef(0);
   const [showVoice, setShowVoice] = useState(false);
   const [hexInput, setHexInput] = useState("7E 00 05 03 FF 00 00 00 EF");
   const [hexTargetIndex, setHexTargetIndex] = useState(0);
@@ -417,10 +421,6 @@ export default function App() {
             setRotateMinutes(parsed.rotateMinutes);
           }
 
-          if (typeof parsed.backgroundEffects === "boolean") {
-            setBackgroundEffects(parsed.backgroundEffects);
-          }
-
           if (typeof parsed.autoDayNight === "boolean") {
             setAutoDayNight(parsed.autoDayNight);
           }
@@ -478,7 +478,6 @@ export default function App() {
         lastDeviceId,
         activeThemeId,
         activeTarget,
-        backgroundEffects,
         autoDayNight,
         rotateMinutes,
         schedule,
@@ -495,7 +494,6 @@ export default function App() {
     lastDeviceId,
     activeThemeId,
     activeTarget,
-    backgroundEffects,
     autoDayNight,
     rotateMinutes,
     schedule,
@@ -1012,23 +1010,6 @@ export default function App() {
     return () => clearInterval(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [device, rotateMinutes]);
-
-  // Hold the audio session only while the phone is actually computing frames. The app never
-  // sleeping costs real battery, so a static colour or a chip-side breathe must not pay it.
-  const needsKeepAlive =
-    backgroundEffects &&
-    Boolean(device) &&
-    (isPhoneDrivenMode(area1) || isPhoneDrivenMode(area2) || Boolean(rotateMinutes));
-
-  useEffect(() => {
-    if (!needsKeepAlive) {
-      stopKeepAlive();
-      return;
-    }
-
-    startKeepAlive();
-    return () => stopKeepAlive();
-  }, [needsKeepAlive]);
 
   // Restart the loop only when something structural changes, not on every colour tweak.
   const animationKey = [
@@ -1602,6 +1583,18 @@ export default function App() {
     );
   };
 
+  const handleBuildStampTap = () => {
+    if (devToolsVisible) {
+      return;
+    }
+    devTapsRef.current += 1;
+    if (devTapsRef.current >= DEV_TOOLS_TAPS) {
+      devTapsRef.current = 0;
+      setDevToolsVisible(true);
+      setStatusMessage("Developer tools unlocked.");
+    }
+  };
+
   const renderSwatch = (color: string, deletable = false) => {
     const isSelected = normalizeHex(color) === normalizeHex(currentColor);
 
@@ -1627,7 +1620,11 @@ export default function App() {
         <View style={styles.heroCard}>
           <Text style={styles.heroTitle}>{device ? "Connected" : "Not Connected"}</Text>
           <Text style={styles.heroSubtitle}>{device?.name ?? device?.id ?? "No controller"}</Text>
-          <Text style={styles.buildStamp}>Build: {BUILD_LABEL}</Text>
+          <Pressable onPress={handleBuildStampTap}>
+            <Text style={styles.buildStamp}>Build: {BUILD_LABEL}</Text>
+          </Pressable>
+          {/* No "run the sweep below" fallback when there is no locked profile: the sweep is
+              hidden in a release build, so it pointed at a section that is not on screen. */}
           {lockedProfile ? (
             <>
               <Text style={styles.heroLocked}>
@@ -1639,9 +1636,7 @@ export default function App() {
                   : "Areas: not identified — both strips change together"}
               </Text>
             </>
-          ) : (
-            <Text style={styles.heroWarn}>No protocol identified yet — run the sweep below.</Text>
-          )}
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -1675,7 +1670,7 @@ export default function App() {
           </View>
         </View>
 
-        {SHOW_DEV_TOOLS ? (
+        {devToolsVisible ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Protocol Sweep</Text>
           <Text style={styles.helperText}>
@@ -1783,7 +1778,7 @@ export default function App() {
         </View>
         ) : null}
 
-        {SHOW_DEV_TOOLS && lockedProfile ? (
+        {devToolsVisible && lockedProfile ? (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Area Sweep</Text>
             <Text style={styles.helperText}>
@@ -1847,7 +1842,7 @@ export default function App() {
           </View>
         ) : null}
 
-        {SHOW_DEV_TOOLS ? (
+        {devToolsVisible ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Command Lab</Text>
           <Text style={styles.helperText}>
@@ -2156,22 +2151,6 @@ export default function App() {
             computed on the phone, so they use your colours but need the app running.
           </Text>
           <View style={styles.row}>
-            <Pressable
-              style={[styles.modeButton, backgroundEffects ? styles.modeActive : null]}
-              onPress={() => setBackgroundEffects((prev) => !prev)}
-            >
-              <Text style={styles.modeText}>
-                {backgroundEffects ? "✓ Gradient in background" : "Gradient in background"}
-              </Text>
-            </Pressable>
-          </View>
-          <Text style={styles.helperText}>
-            Keeps gradient and strobe alive with the app closed, by holding a silent audio
-            session — the only power-hungry thing here, and only while one of those two is
-            running. Holding the Bluetooth link costs almost nothing, and breathe and auto are
-            unaffected either way. Turn it off if you are not plugged in.
-          </Text>
-          <View style={styles.row}>
             {modeOptions.map((mode) => (
               <Pressable
                 key={mode}
@@ -2269,8 +2248,7 @@ export default function App() {
           <Text style={styles.helperText}>
             Steps through all {BUILT_IN_THEMES.length} presets in order, changing on the chosen
             interval. It runs off the app's own clock, so it only advances while the app is
-            open — or in the background, if “Gradient in background” is on, which keeps the app
-            awake for this too. It overrides the interval above once it starts.
+            open. It overrides the interval above once it starts.
           </Text>
         </View>
 
@@ -2327,7 +2305,7 @@ export default function App() {
           ) : null}
         </View>
 
-        {SHOW_DEV_TOOLS ? (
+        {devToolsVisible ? (
         <View style={styles.card}>
           <Pressable onPress={() => setShowDiagnostics((prev) => !prev)}>
             <Text style={styles.sectionTitle}>Diagnostics {showDiagnostics ? "▾" : "▸"}</Text>

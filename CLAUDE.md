@@ -212,10 +212,17 @@ Two things Apple changed that the old plan missed:
       UserDefaults because Siri cold-launches the app. Note: **AppShortcut phrases accept only
       one parameter**, so area cannot be spoken, and an `Int` cannot appear in a phrase at all,
       which is why brightness is Shortcuts-only.
-- [ ] **1c. Native CoreBluetooth path** *(optional)*. Would let intents run without launching
-      the app, so automations fire with the phone locked in a pocket. Duplicates
-      `protocolFamilies.ts` in Swift. Deferred pending the answer to "does the app
-      foregrounding actually annoy you in practice".
+- [ ] **1c. Native CoreBluetooth path** — **no longer optional.** It was the nice-to-have that
+      would let intents run without launching the app; it is now the only way to get back what
+      `UIBackgroundModes` → `audio` used to provide. That key was removed for the App Store
+      submission (guideline 2.5.4 forbids silent playback as a keep-alive), which cost two
+      things: gradient/strobe animating while backgrounded, and **CarPlay taps landing while
+      the phone is asleep** — the regression `b2aeaeb` originally fixed. A tap now writes to
+      UserDefaults and waits for something to resume the app.
+      The fix is to write the A5 frame from Swift over CoreBluetooth so no JS runtime is
+      needed: connect to the remembered peripheral, discover `FFB0`/`FFB1`, write 20 bytes.
+      Duplicates the frame builder and the theme table in Swift. See
+      `docs/app-store-submission.md`.
 - [x] **1d. Shortcuts automation** — CarPlay-connect automation opens the app, which then
       applies the day or night profile by itself.
 - [x] **1e. Driving-task entitlement request** — **GRANTED 2026-08-04**, against my own
@@ -283,3 +290,40 @@ live from current Area 1 / Area 2 colours.
 - [ ] **4e.** Animate the preview from `effectEngine` so gradient/breathe/strobe are visible
       without the car. Must be throttled independently of the BLE write rate.
 - [ ] **4f.** Dim the unselected region so the active target is obvious.
+
+
+CLAUDE.md
+
+## Çıktı
+- Basit, anlaşılır, gereksiz uzatmadan üret. Fazladan açıklama/dosya/örnek ekleme.
+- İstenmeyen refactor, yorum, dokümantasyon ekleme.
+
+## Karar Verme
+- Cevaba geçmeden önce planı zihinde netleştir; belirsizlik varsa varsayımı belirtip devam et.
+- Birden fazla çözüm varsa en basit + sürdürülebilir olanı seç, gerekçeyi tek satırda özetle.
+- Büyük/riskli değişiklik gerekiyorsa önce kısa plan sun, onay bekle.
+
+## Kod Kalitesi
+- Basitlik > kısa süreli hız. Spagetti kod, gereksiz soyutlama, aşırı mühendislik yok.
+- Mevcut mimari/pattern'e uy (proje konvansiyonlarını bul, kopyala).
+- Yeni bağımlılık eklemeden önce mevcut araçlarla çözülüp çözülemeyeceğini kontrol et.
+- Tek dosya/fonksiyon çok büyürse böl; ama gereksiz parçalama da yapma.
+
+## Hata Yönetimi
+- Silent fail yok; hatayı yut ma, logla veya fırlat.
+- try/catch'i sadece anlamlı olduğu yerde kullan, her yeri sarmalama.
+
+## Doğrulama
+- Değişiklikten sonra ilgili test/derleme/lint çalıştır, hatayı düzelt.
+- Test çalıştırmadan "çalışıyor" deme.
+
+## Güvenlik
+- Secret/API key/parola kodun içine gömülmez.
+- Kullanıcı girdisini doğrulamadan sorgu/komuta geçirme (SQL injection, XSS vb. dikkat).
+
+## Kapsam
+- Sadece istenen değişikliği yap; ilgisiz dosyalara dokunma.
+- İstenmeyen dosya/klasör oluşturma.
+
+## Geri Bildirim
+- Sonunda kısa özet: değişen dosyalar, alınan kararlar, varsa riskler/sonraki adım.
