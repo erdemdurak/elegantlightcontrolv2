@@ -1,6 +1,7 @@
 # App Store submission — Elegant Ambient 1.0
 
-iOS only. Android is deliberately out of scope for this round; see *Android, later* at the end.
+Mostly iOS. Android is configured and building a signed AAB as of 2026-08-13 — see the Android
+section near the end for its toolchain, signing and the two-week tester requirement.
 
 | | |
 | --- | --- |
@@ -273,19 +274,56 @@ entitlement actually survived into the distribution profile.
 
 ---
 
-## Android, later
+## Android — configured and building, 2026-08-13
 
-Not started, and there is more to it than an afternoon:
+`./gradlew :app:bundleRelease` produces a signed 44 MB
+`android/app/build/outputs/bundle/release/app-release.aab`.
 
-- `AndroidManifest.xml` has only `INTERNET`. It needs `BLUETOOTH_SCAN` (with
-  `neverForLocation` if you do not want the location permission), `BLUETOOTH_CONNECT`, and the
-  legacy `BLUETOOTH` / `BLUETOOTH_ADMIN` / `ACCESS_FINE_LOCATION` triplet with `maxSdkVersion`
-  for pre-Android-12 devices. Without these,
-  `bleAmbientController.requestAndroidPermissions` asks for permissions the manifest never
-  declared and scanning fails outright.
-- Release builds are signed with the checked-in **debug keystore**. A real upload keystore is
-  needed, kept out of git.
-- The launcher icons are still stock React Native, and there is no adaptive icon.
-- Your Play account is personal and recently created, so production access requires **12 testers
-  running a closed test for 14 continuous days** first. Start that clock early — it is the long
-  pole, not the code.
+**Toolchain.** The Android Gradle Plugin needs **JDK 17**; this machine's default is Java 11
+and the build fails outright on it. Temurin 17 is unpacked at `~/.jdks/jdk-17.0.20+8` and
+`~/.gradle/gradle.properties` points Gradle at it with `org.gradle.java.home`. It was installed
+as a plain tarball rather than through Homebrew, which aborts here on an unrelated permissions
+fault under `/usr/local/lib/node_modules/truffle`. Remove it with `rm -rf ~/.jdks` if wanted.
+
+**Signing.** `~/.android-keys/elegant-upload.jks`, RSA 4096, valid to 2053, alias
+`elegant-upload`. Passwords live in `~/.gradle/gradle.properties` as `ELEGANT_UPLOAD_*` —
+outside the repository, and `*.jks` is gitignored. `app/build.gradle` defines the release
+signing config only when those properties exist, so a machine without the key still builds
+(falling back to debug signing, which Play rejects — that is the point of the fallback being
+loud rather than silent). Verify what you are about to upload:
+
+```bash
+jarsigner -verify -verbose:summary -certs app-release.aab | grep CN=
+# must read CN=Erdem Durak, OU=Elegant Ambient — never "Android Debug"
+```
+
+**Back the keystore up.** Play can reset a lost upload key, but it is a support round-trip.
+
+**Permissions.** The manifest carries both Bluetooth eras and mirrors `requestPermissions()`
+in `bleAmbientController.ts` exactly. Two subtleties worth keeping:
+
+- `neverForLocation` on `BLUETOOTH_SCAN` is what lets the app skip location on Android 12+.
+  The JS assumes it is declared; without it, scanning silently returns nothing.
+- `react-native-ble-plx` injects uncapped `ACCESS_COARSE_LOCATION` and `ACCESS_FINE_LOCATION`
+  as `<uses-permission-sdk-23>`. They are removed with `tools:node="remove"`, leaving only the
+  `maxSdkVersion="30"` FINE declaration. Left alone the app would advertise Location on modern
+  Android despite never requesting it — visible in the Play listing and awkward in the Data
+  Safety form. **Check the merged manifest after touching any of this:**
+  `android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/`.
+
+**Icons** are generated from the iOS 1024 icon: legacy square, a genuinely circular
+`ic_launcher_round`, and an adaptive icon with a monochrome layer, at all five densities.
+
+**Bump `versionCode` in `app/build.gradle` before every Play upload.** It is 1 now, and Play
+refuses a code it has already seen.
+
+### Still to do, and the long pole
+
+- **Nothing Android has ever been run.** No device, no emulator, and BLE does not work in an
+  emulator anyway. The permission flow especially is unverified against real hardware.
+- **The 12-tester rule.** A personal Play account created after November 2023 must run a
+  closed test with **12 testers for 14 continuous days** before it can apply for production.
+  That is a two-week floor unrelated to the code — start it as soon as the AAB is uploaded.
+- Play listing: description, screenshots (Android sizes differ from the App Store's), Data
+  Safety form (answer *no data collected*), privacy policy URL (the same GitHub page works),
+  and a content rating questionnaire.

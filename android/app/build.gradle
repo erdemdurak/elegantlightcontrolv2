@@ -92,15 +92,31 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // The real upload key. Its location and passwords come from ~/.gradle/gradle.properties,
+        // which is outside the repository — the keystore itself is gitignored (*.jks). Play
+        // rejects an app signed with the debug key, which is what this project shipped with
+        // before. Defined only when those properties exist so a plain `assembleDebug` on a
+        // machine without the key still works.
+        if (project.hasProperty('ELEGANT_UPLOAD_STORE_FILE')) {
+            release {
+                storeFile file(ELEGANT_UPLOAD_STORE_FILE)
+                storePassword ELEGANT_UPLOAD_STORE_PASSWORD
+                keyAlias ELEGANT_UPLOAD_KEY_ALIAS
+                keyPassword ELEGANT_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Falls back to debug signing only so a local release build still completes on a
+            // machine without the upload key. Anything destined for Play must be built where
+            // ELEGANT_UPLOAD_STORE_FILE is set, or Play will reject it.
+            signingConfig project.hasProperty('ELEGANT_UPLOAD_STORE_FILE')
+                    ? signingConfigs.release
+                    : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

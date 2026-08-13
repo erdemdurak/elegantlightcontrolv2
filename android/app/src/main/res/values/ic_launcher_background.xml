@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the near-black of the icon artwork, so the inset foreground reads as one
+         piece rather than a badge floating on a different colour. -->
+    <color name="ic_launcher_background">#000000</color>
+</resources>

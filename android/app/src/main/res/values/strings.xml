@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">ElegantLightControl</string>
+    <!-- The launcher name, matching CFBundleDisplayName on iOS. The Play listing is named
+         "Elegant Ambient" because the shorter name was already taken there. -->
+    <string name="app_name">Elegant Light</string>
 </resources>

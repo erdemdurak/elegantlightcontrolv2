@@ -1,6 +1,58 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      Two eras of Bluetooth permissions, and the app must satisfy whichever the device uses.
+      These mirror requestPermissions() in src/ble/bleAmbientController.ts exactly — if that
+      asks for something not declared here, the request is denied without ever prompting.
+
+      Android 12 (API 31) and up: the split BLUETOOTH_SCAN / BLUETOOTH_CONNECT pair.
+      `neverForLocation` is the promise that we do not derive physical location from scan
+      results, which is what lets us skip the location permission entirely. The JS relies on
+      this being here — remove it and scanning silently returns nothing until the user also
+      grants location.
+    -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="31" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!--
+      Android 11 (API 30) and below: the old coarse permissions, plus location, because
+      pre-12 Android treats any BLE scan as a way to infer where you are. Capped with
+      maxSdkVersion so Play does not show them to modern users, and so the app is not asking
+      for location on devices that do not need it.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+
+    <!--
+      react-native-ble-plx's own manifest adds ACCESS_COARSE_LOCATION and ACCESS_FINE_LOCATION
+      as <uses-permission-sdk-23> with no maxSdkVersion, and the merger takes the union. Left
+      alone, this app would declare Location on Android 12+ despite never asking for it:
+      "Location" appears in the Play listing, the Data Safety form has to account for it, and
+      it flatly contradicts the neverForLocation flag above.
+
+      Removing them leaves the capped ACCESS_FINE_LOCATION declared above, which is all the
+      pre-Android-12 path needs — requestPermissions() asks only for FINE, and FINE covers
+      COARSE. Verify with the merged manifest after changing anything here.
+    -->
+    <uses-permission-sdk-23
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        tools:node="remove" />
+    <uses-permission-sdk-23
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        tools:node="remove" />
+
+    <!-- The app controls a BLE lighting controller and does nothing without one, so Play
+         should not offer it to devices that cannot run it. -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <application
       android:name=".MainApplication"
