@@ -33,9 +33,16 @@ Bluetooth is not used for location, for proximity detection, for advertising, or
 of tracking. The names and identifiers of nearby Bluetooth devices are shown to you on screen
 so you can pick your controller, and are not recorded or transmitted.
 
-On iOS, the app does not request location permission. (Android requires a location permission
-in order to scan for Bluetooth devices at all — that is an operating system requirement, and
-the app does not read, use, or store your location.)
+The app does not request location permission on iOS.
+
+On Android 12 and later it does not request location either: the Bluetooth scan permission is
+declared with the `neverForLocation` flag, which is a formal declaration to the operating
+system that scan results are not used to derive your location.
+
+On Android 11 and earlier, the operating system will not permit a Bluetooth scan at all
+without the location permission, so the app must ask for it on those versions. Even there it
+is used solely to satisfy that requirement. The app does not read, use, store or transmit your
+location on any version.
 
 ## Sharing
 
