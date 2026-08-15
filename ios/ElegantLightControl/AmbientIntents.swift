@@ -96,6 +96,35 @@ enum LightColorOption: String, AppEnum {
     .white: "white",
   ]
 
+  /// Plain text for the CarPlay voice-command list, for the same reason as
+  /// `LightPresetOption.displayName`: `caseDisplayRepresentations` holds LocalizedStringResource,
+  /// which will not render into a CPListItem.
+  var spokenName: String {
+    switch self {
+    case .red: return "red"
+    case .orange: return "orange"
+    case .deepOrange: return "deep orange"
+    case .lightOrange: return "light orange"
+    case .salmon: return "salmon"
+    case .warmWhite: return "warm white"
+    case .yellow: return "yellow"
+    case .warmYellow: return "warm yellow"
+    case .lime: return "lime"
+    case .yellowGreen: return "yellow green"
+    case .green: return "green"
+    case .teal: return "teal"
+    case .turquoise: return "turquoise"
+    case .babyBlue: return "baby blue"
+    case .lightBlue: return "light blue"
+    case .blue: return "blue"
+    case .violet: return "violet"
+    case .purple: return "purple"
+    case .pink: return "pink"
+    case .magenta: return "magenta"
+    case .white: return "white"
+    }
+  }
+
   var hex: String {
     switch self {
     case .red: return "#FF0000"
@@ -245,6 +274,17 @@ enum LightModeOption: String, AppEnum {
     .gradient: "gradient",
     .strobe: "strobe",
   ]
+
+  /// Plain text for the CarPlay voice-command list — see `LightColorOption.spokenName`.
+  var spokenName: String {
+    switch self {
+    case .monochrome: return "solid colour"
+    case .breathe: return "breathe"
+    case .auto: return "auto"
+    case .gradient: return "gradient"
+    case .strobe: return "strobe"
+    }
+  }
 }
 
 @available(iOS 16.0, *)

@@ -85,7 +85,93 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     control.tabTitle = "Control"
     control.tabImage = UIImage(systemName: "slider.horizontal.3")
 
-    return CPTabBarTemplate(templates: [presets, control])
+    let voice = makeVoiceTemplate()
+    voice.tabTitle = "Voice"
+    voice.tabImage = UIImage(systemName: "mic")
+
+    return CPTabBarTemplate(templates: [presets, control, voice])
+  }
+
+  // MARK: - Voice commands
+
+  /**
+   What you can say, because the phrases are invisible otherwise — nothing in the car or on the
+   phone lists them, and a phrase you cannot remember is a phrase you will not use.
+
+   Read-only: no row here changes the lights. The four categories each open the full vocabulary
+   rather than showing it inline, so the first screen stays four short lines. Reading a column of
+   21 colour names at speed is exactly what this screen must not ask for.
+   */
+  private func makeVoiceTemplate() -> CPListTemplate {
+    let name = Self.spokenAppName
+
+    let categories: [(pattern: String, detail: String, screen: String, words: [String])] = [
+      (
+        "«colour»", "\(LightColorOption.allCases.count) colours — red, teal, warm white…",
+        "Colours", LightColorOption.allCases.map(\.spokenName)
+      ),
+      (
+        "«preset»", "\(LightPresetOption.allCases.count) presets — Burmester, Night Drive…",
+        "Presets", LightPresetOption.allCases.map(\.displayName)
+      ),
+      (
+        "«mode»", "solid colour, breathe, gradient…",
+        "Modes", LightModeOption.allCases.map(\.spokenName)
+      ),
+      (
+        "on / off", "turns the strips off without unpairing",
+        "Power", LightPowerOption.allCases.map(\.rawValue)
+      ),
+    ]
+
+    let rows = categories.map { category in
+      let item = CPListItem(text: "\(name) \(category.pattern)", detailText: category.detail)
+      item.accessoryType = .disclosureIndicator
+      item.handler = { [weak self] _, completion in
+        self?.interfaceController?.pushTemplate(
+          Self.vocabularyTemplate(title: category.screen, words: category.words),
+          animated: true,
+          completion: nil
+        )
+        completion()
+      }
+      return item
+    }
+
+    // No handler: brightness has no spoken phrase at all, so there is nothing to open.
+    let brightness = CPListItem(
+      text: "Brightness",
+      detailText: "No phrase — a number cannot appear in one. Use the Shortcuts app."
+    )
+
+    return CPListTemplate(
+      title: "Voice",
+      sections: [
+        CPListSection(items: rows, header: "Say “Hey Siri”, then…", sectionIndexTitle: nil),
+        CPListSection(items: [brightness], header: "Not spoken", sectionIndexTitle: nil),
+      ]
+    )
+  }
+
+  /// One screen of accepted words, each written out as the whole phrase — a driver glancing at
+  /// this should not have to assemble it from a pattern and a list.
+  private static func vocabularyTemplate(title: String, words: [String]) -> CPListTemplate {
+    // CarPlay drops a template that exceeds the car's row limit, and the colour list is the
+    // longest thing in this app by some way. Truncating keeps the screen rather than losing it.
+    let items = words.prefix(CPListTemplate.maximumItemCount).map { word in
+      CPListItem(text: "\(spokenAppName) \(word)", detailText: nil)
+    }
+
+    return CPListTemplate(
+      title: title,
+      sections: [CPListSection(items: Array(items), header: nil, sectionIndexTitle: nil)]
+    )
+  }
+
+  /// Read rather than hardcoded: AppShortcut phrases interpolate `applicationName`, which *is*
+  /// CFBundleDisplayName, so taking it from the same place means the two cannot drift.
+  private static var spokenAppName: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Elegant Light"
   }
 
   private static func controlSections() -> [CPListSection] {
