@@ -18,12 +18,11 @@ import { hexToHsv } from "./utils/color";
  *   colour back at you. It carries the saturated half of every pair.
  * - Area 1 is the long door lines and the console.
  *
- * Brightness is **85% on the doors, 70% on the vents** everywhere except Mint, which runs
- * 90/80 by request. Both were set from the car rather than from theory. Earlier versions
- * varied it per theme and ran area 1 lower on the reasoning that the long door lines dominate
- * the mirror and side glass; in practice the chrome around the vents throws enough light back
- * that the vents are the half that needs holding down. Change both numbers together, here,
- * rather than per theme.
+ * Brightness is uniform across every theme: **85% on the doors, 70% on the vents**, set from
+ * the car rather than from theory. Earlier versions varied it per theme and ran area 1 lower
+ * on the reasoning that the long door lines dominate the mirror and side glass; in practice
+ * the chrome around the vents throws enough light back that the vents are the half that needs
+ * holding down. Change both numbers together, here, rather than per theme.
  *
  * Brightness is the dimmer, not the colour — see LightSettings.
  */
@@ -77,9 +76,9 @@ export const BUILT_IN_THEMES: Theme[] = [
   {
     id: "lounge",
     name: "Mint",
-    area1: { hex: "#1180EA", brightness: 90 },
-    area2: { hex: "#70DAFF", brightness: 80 },
-    hint: "Deep blue doors, pale sky vents — the coolest pair here",
+    area1: { hex: "#055CEA", brightness: 85 },
+    area2: { hex: "#3AFFA3", brightness: 70 },
+    hint: "Deep blue doors, mint green vents — the widest hue split here",
   },
   {
     id: "copper",
