@@ -76,9 +76,9 @@ export const BUILT_IN_THEMES: Theme[] = [
   {
     id: "lounge",
     name: "Mint",
-    area1: { hex: "#055CEA", brightness: 85 },
-    area2: { hex: "#3AFFA3", brightness: 70 },
-    hint: "Deep blue doors, mint green vents — the widest hue split here",
+    area1: { hex: "#003FEA", brightness: 85 },
+    area2: { hex: "#78FFB0", brightness: 70 },
+    hint: "Pure blue doors, soft mint vents — the widest hue split here",
   },
   {
     id: "copper",
