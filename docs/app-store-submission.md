@@ -9,7 +9,7 @@ section near the end for its toolchain, signing and the two-week tester requirem
 | Name on the device | **Elegant Light** — `CFBundleDisplayName`, `app.json` `displayName`, and `APP_SPOKEN_NAME` for Siri, all unchanged |
 | Bundle ID | `com.ambientlightcontroller.mobile` |
 | Team | `Y829B2QFT9` |
-| Version / build | `1.1` (`5`) — `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in the pbxproj. `1.0` (`1`) shipped to the App Store; `1.1` adds the CarPlay Voice tab and the locked-phone write path |
+| Version / build | `1.2` (`6`) — `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in the pbxproj. `1.0` (`1`) and `1.1` (`5`) shipped to the App Store; `1.2` fixes the native central holding the BLE link open, which left the controller undiscoverable until the phone was restarted |
 | Devices | iPhone only (`TARGETED_DEVICE_FAMILY = 1`), portrait only |
 | Minimum iOS | 15.1 |
 | Extras | CarPlay (Driving Task), App Intents / Siri |
