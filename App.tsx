@@ -69,7 +69,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v77 · release-the-link";
+const BUILD_LABEL = "v2 · lenze-v78 · honest-area-warning";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -2114,9 +2114,16 @@ export default function App() {
             </Pressable>
           </View>
 
-          {!canAddressAreas ? (
+          {/*
+            Only worth saying once connected. Before that, every user is in this state, and the
+            warning read as a fault report on a working app. The Area Sweep it used to point at
+            is a dev tool hidden in release builds, so it told users to run something they cannot
+            see — see devToolsVisible.
+          */}
+          {device && !canAddressAreas ? (
             <Text style={styles.warnText}>
-              Area addressing not identified yet — commands go to both strips. Run the Area Sweep above.
+              This controller has not told us how to address each area, so commands go to both
+              strips together.
             </Text>
           ) : null}
 
