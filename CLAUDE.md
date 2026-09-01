@@ -295,6 +295,35 @@ live from current Area 1 / Area 2 colours.
       without the car. Must be throttled independently of the BLE write rate.
 - [ ] **4f.** Dim the unselected region so the active target is obvious.
 
+### Task 5 — Play listing screenshots
+
+**The live Play listing uses iPhone screenshots.** All four phone shots carry the iOS status
+bar, and they show Mint in colours from two recolours ago. Play expects screenshots that
+represent the app as it appears on Android; mismatched-platform metadata is an enforcement
+category, and the listing is now public.
+
+The awkward part is that the good shots need hardware. BLE does not work in an emulator, so
+an emulator can only ever show the app disconnected — "Not Connected / No controller", with
+the cabin preview lit by defaults. The current iOS shots show a connected cabin with a preset
+applied, which sells the app far better. Replacing them with honest-but-dead Android captures
+is a real trade, not a straight upgrade.
+
+Verified 2026-09-01: the release APK runs on `Nexus_5_API_24` (x86, the only AVD here) and
+renders correctly at 1080x1920. Captures from that session are the fallback if a device never
+materialises.
+
+- [ ] **5a.** Capture on a real Android phone with the controller powered and in range —
+      connected state, a preset applied, the preview lit. This is the only route to shots as
+      good as the iOS ones.
+- [ ] **5b.** Fallback if no Android device appears: emulator captures of the disconnected UI.
+      Honest about the platform, weaker as marketing.
+- [ ] **5c.** Three sets are needed, 4 images each: phone, 7-inch, 10-inch. All three currently
+      hold iOS images.
+- [ ] **5d.** Keep the source files somewhere. The Play Console is currently the only copy of
+      the originals; nothing in this repo holds them.
+- [ ] **5e.** While reshooting, keep the build stamp off the first screen — it renders under
+      the connection status and reads oddly in a store listing.
+
 
 CLAUDE.md
 
