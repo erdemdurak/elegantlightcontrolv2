@@ -114,7 +114,24 @@ final class AmbientBle: NSObject {
   private func applySuppressed(_ suppressed: Bool) {
     lock.lock()
     isSuppressed = suppressed
+    let held = peripheral
     lock.unlock()
+
+    // Standing down means releasing the link, not just going quiet.
+    //
+    // A connected peripheral stops advertising. While this central held the controller open,
+    // the JS side could scan for it forever and never see it — the app looked dead, and only
+    // a phone restart cleared it, because the restore identifier has iOS relaunch us in the
+    // background and reconnect. Muting the writes was never enough.
+    //
+    // Nothing is lost by dropping it: `connectIfNeeded()` opens a fresh link the moment a
+    // CarPlay or Siri command arrives with suppression lifted, and the handshake is attached
+    // to the connection rather than to the command.
+    guard suppressed, let held, held.state == .connected || held.state == .connecting else {
+      return
+    }
+
+    central.cancelPeripheralConnection(held)
   }
 
   private func applySeed(area1Hex: String, area2Hex: String, brightness1: Int, brightness2: Int) {

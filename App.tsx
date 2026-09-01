@@ -69,7 +69,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v75 · mint-pure-blue";
+const BUILD_LABEL = "v2 · lenze-v76 · release-the-link";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -729,6 +729,24 @@ export default function App() {
   }, [area1, area2, getBle]);
 
   /**
+   * Notice when the link drops instead of going on believing it is connected.
+   *
+   * Driving out of range, or the car being switched off, leaves the app showing Connected while
+   * every write fails silently — and auto-reconnect never re-arms, because it is gated on there
+   * being no device. Clearing the device here is what lets it try again.
+   */
+  useEffect(() => {
+    const ble = getBle();
+    ble.setDisconnectListener(() => {
+      setDevice(null);
+      setGattEntries([]);
+      setStatusMessage("Controller disconnected — looking for it again...");
+    });
+
+    return () => ble.setDisconnectListener(null);
+  }, [getBle]);
+
+  /**
    * Applies a command handed over by an App Intent. Siri cold-launches the app, so this can
    * run before the controller is connected — in that case it is parked and replayed by the
    * reconnect effect below.
@@ -897,6 +915,17 @@ export default function App() {
       }
 
       setStatusMessage("Looking for the controller...");
+
+      // Try the identifier before the scan. Anything already holding the controller open — the
+      // native writer after a CarPlay tap, or iOS having restored that connection in the
+      // background — stops it advertising, and a scan then searches forever for a device that
+      // is sitting right there. CoreBluetooth still knows it by identifier.
+      const known = await ble.findKnownDevice(lastDeviceId);
+      if (known) {
+        cancelled = true;
+        void handleConnect(known);
+        return;
+      }
 
       ble.startScan((scanned) => {
         if (cancelled || scanned.id !== lastDeviceId) {

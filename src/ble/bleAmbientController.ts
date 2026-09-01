@@ -122,6 +122,10 @@ export class BleAmbientController {
 
   private writeChain: Promise<void> = Promise.resolve();
 
+  private disconnectSubscription: Subscription | null = null;
+
+  private onDisconnect: ((deviceId: string) => void) | null = null;
+
   /** Fallback target used before any GATT discovery has happened. */
   private fallbackTarget: BleTarget = {
     serviceUuid: "0000FFE0-0000-1000-8000-00805F9B34FB",
@@ -229,6 +233,31 @@ export class BleAmbientController {
     return this.lockedProfile;
   }
 
+  /**
+   * Called when the link drops on its own — out of range, controller powered down, iOS
+   * reclaiming the radio. Without this the app goes on believing it is connected: writes fail
+   * silently, and auto-reconnect never re-arms because it is gated on having no device.
+   */
+  setDisconnectListener(listener: ((deviceId: string) => void) | null): void {
+    this.onDisconnect = listener;
+  }
+
+  /**
+   * The remembered controller, looked up by identifier rather than found by scanning.
+   *
+   * Scanning cannot see a peripheral that something already holds connected — a connected
+   * peripheral stops advertising. That is recoverable here because CoreBluetooth still knows
+   * the device by its identifier, so a direct connect works where a scan would search forever.
+   */
+  async findKnownDevice(deviceId: string): Promise<Device | null> {
+    try {
+      const known = await this.getManager().devices([deviceId]);
+      return known.find((device) => device.id === deviceId) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   setFallbackTarget(serviceUuid: string, characteristicUuid: string): void {
     const service = serviceUuid.trim();
     const characteristic = characteristicUuid.trim();
@@ -279,6 +308,14 @@ export class BleAmbientController {
     }
 
     this.connectedDevice = connected;
+
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = connected.onDisconnected(() => {
+      this.connectedDevice = null;
+      this.clearNotifications();
+      this.onDisconnect?.(deviceId);
+    });
+
     await this.refreshGattTable();
 
     // Some firmware ignores commands until it has seen the handshake the vendor app
@@ -297,6 +334,8 @@ export class BleAmbientController {
 
   async disconnect(): Promise<void> {
     this.clearNotifications();
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = null;
 
     if (!this.connectedDevice) {
       return;
@@ -918,6 +957,9 @@ export class BleAmbientController {
 
   destroy(): void {
     this.clearNotifications();
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = null;
+    this.onDisconnect = null;
     this.manager?.destroy();
     this.manager = null;
     this.connectedDevice = null;
