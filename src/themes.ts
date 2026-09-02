@@ -143,6 +143,13 @@ export const BUILT_IN_THEMES: Theme[] = [
     area2: { hex: "#FFFFFF", brightness: 70 },
     hint: "Plain white, held low so the leather keeps its grain",
   },
+  {
+    id: "rally",
+    name: "Rally",
+    area1: { hex: "#FF0C15", brightness: 85 },
+    area2: { hex: "#5DB2FF", brightness: 70 },
+    hint: "Hard red doors, sky blue vents — the sharpest warm/cool split here",
+  },
 ];
 
 export const DEFAULT_DAY_THEME_ID = "burmester";

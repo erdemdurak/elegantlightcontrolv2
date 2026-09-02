@@ -69,7 +69,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v78 · honest-area-warning";
+const BUILD_LABEL = "v2 · lenze-v79 · rally-and-smaller-chips";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -2799,14 +2799,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   themeChip: {
-    width: "31%",
-    minWidth: 92,
-    borderRadius: 12,
+    // Four across rather than three. Sixteen presets at the old size pushed Light Control off
+    // the first screen entirely; the swatch is what identifies a preset, and 20px still reads.
+    width: "23%",
+    minWidth: 70,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: "#2B3557",
     backgroundColor: "#232D52",
-    padding: 6,
-    gap: 5,
+    padding: 4,
+    gap: 4,
   },
   themeChipActive: {
     borderColor: "#FFFFFF",
@@ -2814,8 +2816,8 @@ const styles = StyleSheet.create({
   },
   themeSwatch: {
     flexDirection: "row",
-    height: 34,
-    borderRadius: 8,
+    height: 20,
+    borderRadius: 6,
     overflow: "hidden",
   },
   themeHalf: {
@@ -2823,7 +2825,9 @@ const styles = StyleSheet.create({
   },
   themeName: {
     color: "#C3D0EE",
-    fontSize: 11,
+    // 10px because "Nightshade" and "Ultraviolet" have to fit a quarter-width chip on a narrow
+    // phone without wrapping to a second line and making the row uneven.
+    fontSize: 10,
     fontWeight: "700",
     textAlign: "center",
   },

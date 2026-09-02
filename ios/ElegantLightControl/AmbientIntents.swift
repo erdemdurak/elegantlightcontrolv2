@@ -170,6 +170,7 @@ enum LightPresetOption: String, AppEnum {
   case meadow
   case bloom
   case alpine
+  case rally
 
   static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Preset")
   static var caseDisplayRepresentations: [LightPresetOption: DisplayRepresentation] = [
@@ -188,6 +189,7 @@ enum LightPresetOption: String, AppEnum {
     .meadow: "Meadow",
     .bloom: "Bloom",
     .alpine: "Alpine",
+    .rally: "Rally",
   ]
 
   /// Plain text for the CarPlay list. `caseDisplayRepresentations` holds LocalizedStringResource,
@@ -209,6 +211,7 @@ enum LightPresetOption: String, AppEnum {
     case .meadow: return "Meadow"
     case .bloom: return "Bloom"
     case .alpine: return "Alpine"
+    case .rally: return "Rally"
     }
   }
 }
