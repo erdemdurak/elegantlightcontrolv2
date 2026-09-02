@@ -147,8 +147,8 @@ export const BUILT_IN_THEMES: Theme[] = [
     id: "rally",
     name: "Rally",
     area1: { hex: "#FF0C15", brightness: 85 },
-    area2: { hex: "#5DB2FF", brightness: 70 },
-    hint: "Hard red doors, sky blue vents — the sharpest warm/cool split here",
+    area2: { hex: "#79E8F4", brightness: 70 },
+    hint: "Hard red doors, iced cyan vents — the sharpest warm/cool split here",
   },
 ];
 
