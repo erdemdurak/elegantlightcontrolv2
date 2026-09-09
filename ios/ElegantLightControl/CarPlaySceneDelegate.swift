@@ -61,23 +61,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     // — it tints it flat, so two-tone swatches came out monochrome and the tiles were
     // distinguishable only by name. CPListItem images are drawn as-is, which is how audio apps
     // show album art, so the real colours survive here.
-    let rows = Self.loadPresets().map { preset in
-      let item = CPListItem(
-        text: preset.name,
-        detailText: "\(preset.area1)   \(preset.area2)",
-        image: Self.swatch(preset)
-      )
-      item.handler = { _, completion in
-        Self.dispatch(["type": "preset", "value": preset.id])
-        completion()
-      }
-      return item
-    }
-
-    let presets = CPListTemplate(
-      title: "Presets",
-      sections: [CPListSection(items: rows, header: nil, sectionIndexTitle: nil)]
-    )
+    let presets = makePresetsTemplate()
     presets.tabTitle = "Presets"
     presets.tabImage = UIImage(systemName: "paintpalette")
 
@@ -90,6 +74,66 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     voice.tabImage = UIImage(systemName: "mic")
 
     return CPTabBarTemplate(templates: [presets, control, voice])
+  }
+
+  // MARK: - Presets
+
+  /**
+   The preset list, paged so none of them go missing.
+
+   CarPlay drops whatever exceeds `CPListTemplate.maximumItemCount` — on most head units that
+   is 12, and the preset list passed it. Everything from the 13th preset down simply was not
+   there in the car, which is how Dune came to be the last one that worked.
+
+   Truncating would make the newest presets permanently unreachable while driving, so the
+   overflow moves onto a second screen behind a "More presets" row instead.
+   */
+  private func makePresetsTemplate() -> CPListTemplate {
+    let rows = Self.loadPresets().map { Self.presetRow($0) }
+    let cap = CPListTemplate.maximumItemCount
+
+    guard rows.count > cap else {
+      return CPListTemplate(
+        title: "Presets",
+        sections: [CPListSection(items: rows, header: nil, sectionIndexTitle: nil)]
+      )
+    }
+
+    // One slot of the first page is spent on the row that opens the rest.
+    let head = Array(rows.prefix(cap - 1))
+    let rest = Array(rows.dropFirst(cap - 1))
+
+    let more = CPListItem(text: "More presets", detailText: "\(rest.count) more")
+    more.accessoryType = .disclosureIndicator
+    more.handler = { [weak self] _, completion in
+      self?.interfaceController?.pushTemplate(
+        CPListTemplate(
+          title: "More presets",
+          sections: [CPListSection(items: rest, header: nil, sectionIndexTitle: nil)]
+        ),
+        animated: true,
+        completion: nil
+      )
+      completion()
+    }
+
+    return CPListTemplate(
+      title: "Presets",
+      sections: [CPListSection(items: head + [more], header: nil, sectionIndexTitle: nil)]
+    )
+  }
+
+  private static func presetRow(_ preset: Preset) -> CPListItem {
+    let item = CPListItem(
+      text: preset.name,
+      detailText: "\(preset.area1)   \(preset.area2)",
+      image: swatch(preset)
+    )
+    item.handler = { _, completion in
+      dispatch(["type": "preset", "value": preset.id])
+      completion()
+    }
+    return item
   }
 
   // MARK: - Voice commands
