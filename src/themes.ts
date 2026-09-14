@@ -18,11 +18,12 @@ import { hexToHsv } from "./utils/color";
  *   colour back at you. It carries the saturated half of every pair.
  * - Area 1 is the long door lines and the console.
  *
- * Brightness is uniform across every theme: **85% on the doors, 70% on the vents**, set from
- * the car rather than from theory. Earlier versions varied it per theme and ran area 1 lower
- * on the reasoning that the long door lines dominate the mirror and side glass; in practice
- * the chrome around the vents throws enough light back that the vents are the half that needs
- * holding down. Change both numbers together, here, rather than per theme.
+ * Brightness is **85% on the doors, 70% on the vents** everywhere except Cobalt, which runs
+ * 100/85 by request. Both were set from the car rather than from theory. Earlier versions varied
+ * it per theme and ran area 1 lower on the reasoning that the long door lines dominate the
+ * mirror and side glass; in practice the chrome around the vents throws enough light back that
+ * the vents are the half that needs holding down. Change both numbers together, here, rather
+ * than per theme.
  *
  * Brightness is the dimmer, not the colour — see LightSettings.
  */
@@ -109,11 +110,13 @@ export const BUILT_IN_THEMES: Theme[] = [
     hint: "Warm sand doors against violet vents — the loudest pair here",
   },
   {
+    // Kept the `ultraviolet` id through the rename, as with lounge/Mint and ice/Blush: the id is
+    // persisted in saved state and in LightPresetOption, so changing it would orphan both.
     id: "ultraviolet",
-    name: "Ultraviolet",
-    area1: { hex: "#4000FF", brightness: 85 },
-    area2: { hex: "#BF00FF", brightness: 70 },
-    hint: "Indigo doors, magenta vents — the two ends of violet against each other",
+    name: "Cobalt",
+    area1: { hex: "#3B82F6", brightness: 100 },
+    area2: { hex: "#1500FF", brightness: 85 },
+    hint: "Bright azure doors over deep blue vents — the only pair run flat out on the doors",
   },
   {
     id: "dune",

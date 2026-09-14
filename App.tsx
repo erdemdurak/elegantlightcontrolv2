@@ -69,7 +69,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v82 · release-1-3";
+const BUILD_LABEL = "v2 · lenze-v84 · preset-cycle";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -168,7 +168,13 @@ const defaultArea2: LightSettings = {
 };
 
 /** Slider positions for preset rotation. Index 0 is off; the rest are minutes. */
-const ROTATE_STEPS: Array<number | null> = [null, 1, 5, 10, 15, 30];
+const ROTATE_STEPS: Array<number | null> = [null, 1, 3, 5, 10, 15, 30];
+
+/** Enough variety to be worth watching, few enough to stay a deliberate choice. */
+const MAX_CYCLE_PRESETS = 5;
+
+/** What the cycle falls back to when it is switched on with nothing picked. */
+const DEFAULT_CYCLE_MINUTES = 3;
 
 const MAX_GRADIENT_COLORS = 6;
 
@@ -324,6 +330,7 @@ export default function App() {
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
   const [autoDayNight, setAutoDayNight] = useState(false);
   const [rotateMinutes, setRotateMinutes] = useState<number | null>(null);
+  const [cycleThemeIds, setCycleThemeIds] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(defaultSchedule);
   /** Bumped whenever CarPlay is seen active, to re-trigger the reconnect effect. */
   const [carPlayTick, setCarPlayTick] = useState(0);
@@ -426,6 +433,15 @@ export default function App() {
             setRotateMinutes(parsed.rotateMinutes);
           }
 
+          if (Array.isArray(parsed.cycleThemeIds)) {
+            // Drop ids for presets that no longer exist, or the cycle would stall on a gap.
+            setCycleThemeIds(
+              parsed.cycleThemeIds
+                .filter((id) => BUILT_IN_THEMES.some((theme) => theme.id === id))
+                .slice(0, MAX_CYCLE_PRESETS),
+            );
+          }
+
           if (typeof parsed.autoDayNight === "boolean") {
             setAutoDayNight(parsed.autoDayNight);
           }
@@ -485,6 +501,7 @@ export default function App() {
         activeTarget,
         autoDayNight,
         rotateMinutes,
+        cycleThemeIds,
         schedule,
       };
       void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -501,6 +518,7 @@ export default function App() {
     activeTarget,
     autoDayNight,
     rotateMinutes,
+    cycleThemeIds,
     schedule,
     hydrated,
   ]);
@@ -1052,10 +1070,48 @@ export default function App() {
   }, [area1Color, area2Color, area1.brightness, area2.brightness]);
 
   // Refreshed every render, so the interval below always runs the current closure.
+  /**
+   * The presets the cycle steps through, in the order they appear in the grid.
+   *
+   * An empty selection means all of them — that is what rotation did before it could be
+   * narrowed, so a save from an older build keeps behaving the way its owner set it up.
+   */
+  const cycleThemes = useMemo(() => {
+    if (cycleThemeIds.length === 0) {
+      return BUILT_IN_THEMES;
+    }
+
+    return BUILT_IN_THEMES.filter((theme) => cycleThemeIds.includes(theme.id));
+  }, [cycleThemeIds]);
+
+  const cycleThemesRef = useRef(cycleThemes);
+  cycleThemesRef.current = cycleThemes;
+
   const rotateRef = useRef(() => {});
   rotateRef.current = () => {
-    const current = BUILT_IN_THEMES.findIndex((theme) => theme.id === activeThemeIdRef.current);
-    handleApplyTheme(BUILT_IN_THEMES[(current + 1) % BUILT_IN_THEMES.length]);
+    const themes = cycleThemesRef.current;
+    if (themes.length === 0) {
+      return;
+    }
+
+    // Not in the list — because the cycle was just narrowed, or a preset was applied by hand —
+    // so findIndex returns -1 and the next step lands on the first entry.
+    const current = themes.findIndex((theme) => theme.id === activeThemeIdRef.current);
+    handleApplyTheme(themes[(current + 1) % themes.length]);
+  };
+
+  const handleToggleCyclePreset = (id: string) => {
+    setCycleThemeIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((entry) => entry !== id);
+      }
+
+      if (prev.length >= MAX_CYCLE_PRESETS) {
+        return prev;
+      }
+
+      return [...prev, id];
+    });
   };
 
   /**
@@ -2335,8 +2391,51 @@ export default function App() {
 
           {[...schedule].sort((a, b) => a.startHour - b.startHour).map(renderSlot)}
 
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>5. Preset Cycle</Text>
+          <Text style={styles.helperText}>
+            Step through a handful of presets on a timer. Pick up to {MAX_CYCLE_PRESETS}; with
+            none picked it runs through all {BUILT_IN_THEMES.length}. It uses the app's own
+            clock, so it only advances while the app is open, and it overrides the schedule
+            once it starts.
+          </Text>
+
+          <View style={styles.grid}>
+            {BUILT_IN_THEMES.map((theme) => {
+              const picked = cycleThemeIds.includes(theme.id);
+              const full = !picked && cycleThemeIds.length >= MAX_CYCLE_PRESETS;
+
+              return (
+                <Pressable
+                  key={theme.id}
+                  onPress={() => handleToggleCyclePreset(theme.id)}
+                  disabled={full}
+                  style={[
+                    styles.themeChip,
+                    picked ? styles.themeChipActive : null,
+                    full ? styles.themeChipDisabled : null,
+                  ]}
+                >
+                  <View style={styles.themeSwatch}>
+                    <View style={[styles.themeHalf, { backgroundColor: theme.area1.hex }]} />
+                    <View style={[styles.themeHalf, { backgroundColor: theme.area2.hex }]} />
+                  </View>
+                  <Text style={[styles.themeName, picked ? styles.themeNameActive : null]}>
+                    {theme.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Text style={styles.sectionSubtitle}>
-            Rotate presets: {rotateMinutes ? `every ${rotateMinutes} min` : "off"}
+            {cycleThemeIds.length > 0
+              ? `${cycleThemeIds.length} of ${MAX_CYCLE_PRESETS} picked`
+              : `All ${BUILT_IN_THEMES.length} presets`}
+            {" · "}
+            {rotateMinutes ? `every ${rotateMinutes} min` : "cycle off"}
           </Text>
           <Slider
             minimumValue={0}
@@ -2347,16 +2446,20 @@ export default function App() {
             maximumTrackTintColor="#425461"
             onSlidingComplete={(value) => setRotateMinutes(ROTATE_STEPS[Math.round(value)])}
           />
-          <Text style={styles.helperText}>
-            Steps through all {BUILT_IN_THEMES.length} presets in order, changing on the chosen
-            interval. It runs off the app's own clock, so it only advances while the app is
-            open. It overrides the interval above once it starts.
-          </Text>
+
+          {rotateMinutes ? null : (
+            <Pressable
+              style={styles.modeButton}
+              onPress={() => setRotateMinutes(DEFAULT_CYCLE_MINUTES)}
+            >
+              <Text style={styles.modeText}>Start cycling every {DEFAULT_CYCLE_MINUTES} min</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.card}>
           <Pressable onPress={() => setShowVoice((prev) => !prev)}>
-            <Text style={styles.sectionTitle}>5. Voice Commands {showVoice ? "▾" : "▸"}</Text>
+            <Text style={styles.sectionTitle}>6. Voice Commands {showVoice ? "▾" : "▸"}</Text>
           </Pressable>
 
           {showVoice ? (
@@ -2809,6 +2912,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#232D52",
     padding: 4,
     gap: 4,
+  },
+  /** Greyed while the cap is reached, so it is obvious why tapping does nothing. */
+  themeChipDisabled: {
+    opacity: 0.35,
   },
   themeChipActive: {
     borderColor: "#FFFFFF",

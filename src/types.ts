@@ -65,6 +65,11 @@ export type AppStateSnapshot = {
   autoDayNight?: boolean;
   /** Minutes between automatic preset changes, or null when not rotating. */
   rotateMinutes?: number | null;
+  /**
+   * Which presets the cycle steps through, by theme id. Empty means all of them, which is what
+   * rotation did before the cycle could be narrowed — so an older save keeps its behaviour.
+   */
+  cycleThemeIds?: string[];
   /** Three slots, applied on connect by the clock. */
   schedule?: ScheduleSlot[];
   /** Superseded by `schedule`; still read once so older saves migrate. */
