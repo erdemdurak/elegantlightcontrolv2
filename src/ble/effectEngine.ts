@@ -62,7 +62,7 @@ function mix(from: Rgb, to: Rgb, t: number): Rgb {
 }
 
 /** Ease in and out of each colour stop so transitions arrive gently instead of snapping. */
-function smoothstep(t: number): number {
+export function smoothstep(t: number): number {
   const clamped = Math.max(0, Math.min(1, t));
   return clamped * clamped * (3 - 2 * clamped);
 }
@@ -75,7 +75,7 @@ function smoothstep(t: number): number {
  * change. Rotating the hue keeps saturation up the whole way, so it looks like the light is
  * sweeping through the spectrum.
  */
-function mixThroughHue(from: Rgb, to: Rgb, t: number): Rgb {
+export function mixThroughHue(from: Rgb, to: Rgb, t: number): Rgb {
   const a = rgbToHsv(from);
   const b = rgbToHsv(to);
 
@@ -143,4 +143,19 @@ export function computeEffectRgb(settings: LightSettings, elapsedMs: number): Rg
 /** How often to push a frame, given how many areas are being animated. */
 export function frameIntervalMs(areaCount: number): number {
   return areaCount > 1 ? 190 : 110;
+}
+
+/** How long one preset takes to become the next, and how often a frame goes out. */
+export const CROSSFADE_MS = 4000;
+
+/**
+ * One frame of a preset-to-preset crossfade.
+ *
+ * Reuses the gradient's hue rotation rather than blending RGB: straight RGB interpolation
+ * drags a transition through a muddy midpoint, which is what makes a fade read as a fault
+ * rather than a choice. Brightness is deliberately not part of this — it is a separate
+ * command on this protocol, and folding it in here would dim the colour twice.
+ */
+export function crossfadeRgb(from: Rgb, to: Rgb, t: number): Rgb {
+  return mixThroughHue(from, to, smoothstep(t));
 }

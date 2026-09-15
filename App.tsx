@@ -41,7 +41,13 @@ import type {
   LightSettings,
   LockedProfile,
 } from "./src/types";
-import { computeEffectRgb, frameIntervalMs, isAnimatedMode } from "./src/ble/effectEngine";
+import {
+  CROSSFADE_MS,
+  computeEffectRgb,
+  crossfadeRgb,
+  frameIntervalMs,
+  isAnimatedMode,
+} from "./src/ble/effectEngine";
 import {
   consumeSiriCommand,
   onCarPlayCommand,
@@ -53,7 +59,7 @@ import {
   seedNativeState,
   setNativeSuppressed,
 } from "./src/ble/nativeBle";
-import { hexToHsv, hsvToHex, vibrantSaturation } from "./src/utils/color";
+import { hexToHsv, hexToRgb, hsvToHex, hsvToRgb, vibrantSaturation } from "./src/utils/color";
 import { InteriorPreview } from "./src/components/InteriorPreview";
 import {
   BUILT_IN_THEMES,
@@ -69,7 +75,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v84 · preset-cycle";
+const BUILD_LABEL = "v2 · lenze-v85 · soft-cycle";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -654,6 +660,11 @@ export default function App() {
   };
 
   const handleApplyTheme = (theme: Theme) => {
+    // Whatever the cycle was fading towards, this supersedes it.
+    if (fadeCancelRef.current) {
+      fadeCancelRef.current.cancelled = true;
+    }
+
     setActiveThemeId(theme.id);
     // A preset sets colour, brightness and mode — never the gradient stops. Those are a
     // separate thing the user built by hand, and overwriting them meant a round trip through
@@ -1087,6 +1098,73 @@ export default function App() {
   const cycleThemesRef = useRef(cycleThemes);
   cycleThemesRef.current = cycleThemes;
 
+  /** Raised to abandon a crossfade in progress, so two of them never write at once. */
+  const fadeCancelRef = useRef<{ cancelled: boolean } | null>(null);
+
+  /**
+   * Walk the strips from what they are showing now to the next preset, rather than cutting.
+   *
+   * Only the colour is faded. Brightness is a separate command on this protocol — sending it
+   * every frame would double the write rate for something almost nothing changes, since every
+   * preset but Cobalt shares 85/70 — so the final `handleApplyTheme` sets colour, brightness
+   * and mode exactly at the end.
+   *
+   * A phone-driven mode is already writing a frame every 110-190ms from the animation loop.
+   * Fading underneath that would put two writers on the same characteristic, so in that case
+   * the preset is applied outright, exactly as it was before.
+   */
+  const fadeToTheme = (theme: Theme) => {
+    const from1 = settingsRef.current.area1;
+    const from2 = settingsRef.current.area2;
+
+    // Without area addressing a frame for one area reaches both, so the two halves of the fade
+    // would overwrite each other. Cut instead, which is what the cycle did before.
+    if (isPhoneDrivenMode(from1) || isPhoneDrivenMode(from2) || !canAddressAreas) {
+      handleApplyTheme(theme);
+      return;
+    }
+
+    if (fadeCancelRef.current) {
+      fadeCancelRef.current.cancelled = true;
+    }
+
+    const token = { cancelled: false };
+    fadeCancelRef.current = token;
+
+    const start1 = hsvToRgb(from1.hue, from1.saturation, from1.value ?? 100);
+    const start2 = hsvToRgb(from2.hue, from2.saturation, from2.value ?? 100);
+    const end1 = hexToRgb(theme.area1.hex);
+    const end2 = hexToRgb(theme.area2.hex);
+
+    const ble = getBle();
+    const interval = frameIntervalMs(2);
+    const startedAt = Date.now();
+
+    void (async () => {
+      while (!token.cancelled) {
+        const t = (Date.now() - startedAt) / CROSSFADE_MS;
+        if (t >= 1) {
+          break;
+        }
+
+        try {
+          await ble.sendAnimationFrame("area1", crossfadeRgb(start1, end1, t));
+          await ble.sendAnimationFrame("area2", crossfadeRgb(start2, end2, t));
+        } catch {
+          // A dropped frame mid-fade is not worth abandoning the preset change for.
+        }
+
+        await new Promise<void>((resolve) => setTimeout(resolve, interval));
+      }
+
+      if (!token.cancelled) {
+        // Land on the preset itself, so colour, brightness and mode are exact rather than
+        // wherever the interpolation happened to stop.
+        handleApplyTheme(theme);
+      }
+    })();
+  };
+
   const rotateRef = useRef(() => {});
   rotateRef.current = () => {
     const themes = cycleThemesRef.current;
@@ -1097,7 +1175,7 @@ export default function App() {
     // Not in the list — because the cycle was just narrowed, or a preset was applied by hand —
     // so findIndex returns -1 and the next step lands on the first entry.
     const current = themes.findIndex((theme) => theme.id === activeThemeIdRef.current);
-    handleApplyTheme(themes[(current + 1) % themes.length]);
+    fadeToTheme(themes[(current + 1) % themes.length]);
   };
 
   const handleToggleCyclePreset = (id: string) => {
@@ -2396,10 +2474,11 @@ export default function App() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>5. Preset Cycle</Text>
           <Text style={styles.helperText}>
-            Step through a handful of presets on a timer. Pick up to {MAX_CYCLE_PRESETS}; with
-            none picked it runs through all {BUILT_IN_THEMES.length}. It uses the app's own
-            clock, so it only advances while the app is open, and it overrides the schedule
-            once it starts.
+            Step through a handful of presets on a timer, fading from one to the next over
+            about {Math.round(CROSSFADE_MS / 1000)} seconds. Pick up to {MAX_CYCLE_PRESETS};
+            with none picked it runs through all {BUILT_IN_THEMES.length}. It uses the app's own
+            clock, so it only advances while the app is open, and it overrides the schedule once
+            it starts.
           </Text>
 
           <View style={styles.grid}>
