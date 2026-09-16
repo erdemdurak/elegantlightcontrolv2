@@ -1,5 +1,14 @@
 {
   "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "paths": {
+      // react-native-iap's exports map points the "react-native" condition at its raw
+      // TypeScript source, so tsc typechecks the library itself and reports its errors as
+      // ours. Point the compiler at the published declarations instead; Metro still resolves
+      // the source at bundle time, which is what the library intends.
+      "react-native-iap": ["./node_modules/react-native-iap/lib/typescript/src/index.d.ts"]
+    }
+  },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["**/node_modules", "**/Pods"]
 }

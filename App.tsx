@@ -60,6 +60,12 @@ import {
   setNativeSuppressed,
 } from "./src/ble/nativeBle";
 import { hexToHsv, hexToRgb, hsvToHex, hsvToRgb, vibrantSaturation } from "./src/utils/color";
+import { Paywall } from "./src/components/Paywall";
+import {
+  loadEntitlement,
+  startPurchaseListeners,
+  type Entitlement,
+} from "./src/billing/entitlement";
 import { InteriorPreview } from "./src/components/InteriorPreview";
 import {
   BUILT_IN_THEMES,
@@ -75,7 +81,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v86 · cycle-catchup";
+const BUILD_LABEL = "v2 · lenze-v87 · paywall";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -335,6 +341,7 @@ export default function App() {
   const [activeThemeId, setActiveThemeId] = useState<string | null>(null);
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
   const [autoDayNight, setAutoDayNight] = useState(false);
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [rotateMinutes, setRotateMinutes] = useState<number | null>(null);
   const [cycleThemeIds, setCycleThemeIds] = useState<string[]>([]);
   const [cycleAnchorAt, setCycleAnchorAt] = useState<number | null>(null);
@@ -540,6 +547,34 @@ export default function App() {
     return () => {
       bleRef.current?.destroy();
       bleRef.current = null;
+    };
+  }, []);
+
+  /**
+   * Work out whether this install is unlocked, before anything else is shown.
+   *
+   * Also listens for purchases that arrive without the app asking — a subscription renewing
+   * while the app is open, or a purchase finishing after being interrupted — because every one
+   * of them has to be handed back to the store or Google refunds it after three days.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadEntitlement().then((result) => {
+      if (!cancelled) {
+        setEntitlement(result);
+      }
+    });
+
+    const stop = startPurchaseListeners((result) => {
+      if (!cancelled) {
+        setEntitlement(result);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      stop();
     };
   }, []);
 
@@ -1909,6 +1944,21 @@ export default function App() {
       />
     );
   };
+
+  if (entitlement === null) {
+    // Deliberately blank rather than a spinner: the check is a storage read plus one store
+    // call, and a flash of "loading" on every cold start reads worse than a dark screen.
+    return <SafeAreaView style={styles.safeArea} />;
+  }
+
+  if (!entitlement.unlocked) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" />
+        <Paywall onUnlocked={setEntitlement} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
