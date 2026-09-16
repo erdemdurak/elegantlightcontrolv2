@@ -20,8 +20,13 @@ import {
  * does not appear rather than being offered and then failing.
  */
 
-const TERMS_URL = "https://github.com/erdemdurak/elegantlightcontrolv2#terms";
-const PRIVACY_URL = "https://github.com/erdemdurak/elegantlightcontrolv2/blob/master/docs/privacy-policy.md";
+/**
+ * The pages in `web/`, deployed to Netlify. Apple checks both links during review, so they
+ * have to resolve — change SITE here if the Netlify site is named differently.
+ */
+const SITE = "https://elegant-ambient.netlify.app";
+const TERMS_URL = `${SITE}/terms`;
+const PRIVACY_URL = `${SITE}/privacy`;
 
 const LABELS: Record<ProductKey, { title: string; detail: string }> = {
   lifetime: { title: "Lifetime", detail: "One payment. Yours permanently." },

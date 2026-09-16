@@ -1,0 +1,14 @@
+# Deploys the static pages the app's paywall links to. No build step — plain HTML.
+[build]
+  publish = "web"
+
+# Clean URLs, so the store links can be /privacy and /terms rather than .html.
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 200

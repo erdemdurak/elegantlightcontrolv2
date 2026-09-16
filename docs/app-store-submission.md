@@ -19,8 +19,10 @@ section near the end for its toolchain, signing and the two-week tester requirem
 ## What the repo already has
 
 - `PrivacyInfo.xcprivacy` — declares FileTimestamp, UserDefaults and SystemBootTime API use,
-  `NSPrivacyCollectedDataTypes` empty, `NSPrivacyTracking` false. Matches reality: no account,
-  no server, no analytics, no network calls at all.
+  `NSPrivacyCollectedDataTypes` empty, `NSPrivacyTracking` false. Still accurate after billing
+  was added: purchases go through StoreKit and Play Billing, which are the platforms' own, and
+  nothing about the user reaches a server of ours. There is no analytics or advertising SDK.
+  The App Privacy questionnaire stays *no data collected* for the same reason.
 - `ITSAppUsesNonExemptEncryption = false` in `Info.plist`, so the export-compliance question is
   answered at upload time and never appears in App Store Connect.
 - `com.apple.developer.carplay-driving-task` in the entitlements file, granted 2026-08-04.
@@ -146,8 +148,12 @@ Profiles/`, not the old `~/Library/MobileDevice/` path.
 > the cabin lighting changing to match; adjusting colour and brightness per zone; switching to
 > gradient mode; and the CarPlay preset list operating the same controls from the head unit.
 >
-> There is no account, no sign-in, no server and no network access of any kind. All settings are
-> stored locally with AsyncStorage. Nothing is collected or transmitted.
+> There is no account, no sign-in and no server operated by us. All settings are stored locally
+> with AsyncStorage. Nothing about the user is collected or transmitted.
+>
+> The app's only network traffic is to the App Store, to check whether this Apple ID owns the
+> subscription or the lifetime unlock, and to make purchases. That is StoreKit; no payment
+> details reach us, and there is no analytics, crash reporting or advertising SDK in the build.
 >
 > Bluetooth is used only as a Core Bluetooth central, writing colour and brightness commands to
 > the lighting controller.

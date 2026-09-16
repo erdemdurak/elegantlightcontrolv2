@@ -1,14 +1,27 @@
 # Privacy Policy — Elegant Ambient
 
-**Last updated: 10 August 2026**
+**Last updated: 16 September 2026**
 
 Elegant Ambient ("the app") controls Bluetooth LE ambient lighting hardware installed in a
 vehicle cabin.
+
+> Published at https://elegant-ambient.netlify.app/privacy — `web/privacy.html` in this repo is
+> the deployed copy, and the two must be changed together.
 
 ## What the app collects
 
 **Nothing.** The app collects no personal data of any kind. There is no account, no sign-in,
 no registration, and no way to identify you through the app.
+
+## Purchases
+
+Access to the app is sold through the App Store and Google Play. When you buy or restore a
+subscription or the lifetime unlock, the app asks Apple or Google whether this account owns it
+and stores the yes-or-no answer on the device.
+
+**Payments are handled entirely by Apple and Google.** No card details, billing address or
+other payment information ever reaches the developer. These store requests are the only network
+traffic the app makes; there is no analytics, crash reporting or advertising.
 
 ## What the app stores
 
