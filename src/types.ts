@@ -70,6 +70,14 @@ export type AppStateSnapshot = {
    * rotation did before the cycle could be narrowed — so an older save keeps its behaviour.
    */
   cycleThemeIds?: string[];
+  /**
+   * When the cycle last advanced, as epoch ms.
+   *
+   * iOS suspends a backgrounded app and its timers with it, so the cycle cannot tick in your
+   * pocket. This is what lets it work out how many steps it missed and land on the right
+   * preset the moment the app is alive again.
+   */
+  cycleAnchorAt?: number | null;
   /** Three slots, applied on connect by the clock. */
   schedule?: ScheduleSlot[];
   /** Superseded by `schedule`; still read once so older saves migrate. */

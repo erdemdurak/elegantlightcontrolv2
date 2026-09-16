@@ -75,7 +75,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v85 · soft-cycle";
+const BUILD_LABEL = "v2 · lenze-v86 · cycle-catchup";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -337,6 +337,7 @@ export default function App() {
   const [autoDayNight, setAutoDayNight] = useState(false);
   const [rotateMinutes, setRotateMinutes] = useState<number | null>(null);
   const [cycleThemeIds, setCycleThemeIds] = useState<string[]>([]);
+  const [cycleAnchorAt, setCycleAnchorAt] = useState<number | null>(null);
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(defaultSchedule);
   /** Bumped whenever CarPlay is seen active, to re-trigger the reconnect effect. */
   const [carPlayTick, setCarPlayTick] = useState(0);
@@ -439,6 +440,10 @@ export default function App() {
             setRotateMinutes(parsed.rotateMinutes);
           }
 
+          if (typeof parsed.cycleAnchorAt === "number") {
+            setCycleAnchorAt(parsed.cycleAnchorAt);
+          }
+
           if (Array.isArray(parsed.cycleThemeIds)) {
             // Drop ids for presets that no longer exist, or the cycle would stall on a gap.
             setCycleThemeIds(
@@ -508,6 +513,7 @@ export default function App() {
         autoDayNight,
         rotateMinutes,
         cycleThemeIds,
+        cycleAnchorAt,
         schedule,
       };
       void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -525,6 +531,7 @@ export default function App() {
     autoDayNight,
     rotateMinutes,
     cycleThemeIds,
+    cycleAnchorAt,
     schedule,
     hydrated,
   ]);
@@ -1165,17 +1172,93 @@ export default function App() {
     })();
   };
 
-  const rotateRef = useRef(() => {});
-  rotateRef.current = () => {
+  /** Move the cycle on by `steps` places and remember when it happened. */
+  const advanceCycle = (steps: number) => {
     const themes = cycleThemesRef.current;
-    if (themes.length === 0) {
+    if (themes.length === 0 || steps < 1) {
       return;
     }
 
     // Not in the list — because the cycle was just narrowed, or a preset was applied by hand —
     // so findIndex returns -1 and the next step lands on the first entry.
     const current = themes.findIndex((theme) => theme.id === activeThemeIdRef.current);
-    fadeToTheme(themes[(current + 1) % themes.length]);
+    fadeToTheme(themes[(current + steps) % themes.length]);
+  };
+
+  const rotateRef = useRef(() => {});
+  rotateRef.current = () => {
+    advanceCycle(1);
+    setCycleAnchorAt(Date.now());
+  };
+
+  /**
+   * Land on the preset the cycle would be showing, after time it could not tick through.
+   *
+   * iOS suspends a backgrounded app and stops its timers, so the cycle stands still in your
+   * pocket — `bluetooth-central` grants event-driven wake-ups, not a clock, and the silent-audio
+   * keepalive that used to hold the app awake was removed for App Store guideline 2.5.4. Rather
+   * than resume from wherever it stopped, work out how many intervals went by and skip to the
+   * right one, so opening the app or plugging into the car shows the cabin the cycle owes you.
+   */
+  const catchUpRef = useRef(() => {});
+  catchUpRef.current = () => {
+    if (!rotateMinutes || !cycleAnchorAt) {
+      return;
+    }
+
+    const periodMs = rotateMinutes * 60_000;
+    const missed = Math.floor((Date.now() - cycleAnchorAt) / periodMs);
+    if (missed < 1) {
+      return;
+    }
+
+    advanceCycle(missed);
+    // Keep the phase rather than restarting it, so the next tick falls where it would have.
+    setCycleAnchorAt(cycleAnchorAt + missed * periodMs);
+  };
+
+  // Catch up whenever the app is alive again: on foreground, and on connecting to the
+  // controller, which is the moment a cabin full of stale colour is about to be visible.
+  useEffect(() => {
+    if (!device || !rotateMinutes) {
+      return;
+    }
+
+    catchUpRef.current();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        catchUpRef.current();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [device, rotateMinutes]);
+
+  /**
+   * Schedule and Preset Cycle both apply presets on their own, so running both means two
+   * things fighting over the cabin. Turning either one on closes the other.
+   */
+  const handleToggleSchedule = () => {
+    setAutoDayNight((prev) => {
+      if (!prev) {
+        setRotateMinutes(null);
+        setCycleAnchorAt(null);
+      }
+      return !prev;
+    });
+  };
+
+  const handleToggleCycle = () => {
+    setRotateMinutes((prev) => {
+      if (prev) {
+        setCycleAnchorAt(null);
+        return null;
+      }
+
+      setAutoDayNight(false);
+      setCycleAnchorAt(Date.now());
+      return DEFAULT_CYCLE_MINUTES;
+    });
   };
 
   const handleToggleCyclePreset = (id: string) => {
@@ -1195,9 +1278,11 @@ export default function App() {
   /**
    * Step through the presets on a timer.
    *
-   * Runs off the app's own clock, so it only ticks while the app is alive — foregrounded, or
-   * backgrounded with the keepalive holding it up. A suspended app does not rotate, and that
-   * is why the keepalive below counts rotation as work worth staying awake for.
+   * Runs off the app's own clock, so it only ticks while the app is in front. A backgrounded
+   * app is suspended within seconds and its timers stop: `bluetooth-central` grants
+   * event-driven wake-ups, not a clock, and the silent-audio keepalive that used to hold the
+   * app awake was removed for App Store guideline 2.5.4. `catchUpRef` is what covers the gap,
+   * skipping to the preset the cycle owes you the moment the app is alive again.
    *
    * The tick goes through a ref because the interval is created once and would otherwise keep
    * calling the closure from the render that made it. That closure captured `canAddressAreas`,
@@ -2459,12 +2544,15 @@ export default function App() {
           <View style={styles.row}>
             <Pressable
               style={[styles.modeButton, autoDayNight ? styles.modeActive : null]}
-              onPress={() => setAutoDayNight((prev) => !prev)}
+              onPress={handleToggleSchedule}
             >
               <Text style={styles.modeText}>
                 {autoDayNight ? "✓ Automatic on connect" : "Automatic on connect"}
               </Text>
             </Pressable>
+            {rotateMinutes ? (
+              <Text style={styles.warnText}>Closed — Preset Cycle is running</Text>
+            ) : null}
           </View>
 
           {[...schedule].sort((a, b) => a.startHour - b.startHour).map(renderSlot)}
@@ -2523,17 +2611,31 @@ export default function App() {
             value={Math.max(0, ROTATE_STEPS.indexOf(rotateMinutes))}
             minimumTrackTintColor="#45f0b6"
             maximumTrackTintColor="#425461"
-            onSlidingComplete={(value) => setRotateMinutes(ROTATE_STEPS[Math.round(value)])}
+            onSlidingComplete={(value) => {
+              const next = ROTATE_STEPS[Math.round(value)];
+              setRotateMinutes(next);
+              setCycleAnchorAt(next ? Date.now() : null);
+              if (next) {
+                setAutoDayNight(false);
+              }
+            }}
           />
 
-          {rotateMinutes ? null : (
+          <View style={styles.row}>
             <Pressable
-              style={styles.modeButton}
-              onPress={() => setRotateMinutes(DEFAULT_CYCLE_MINUTES)}
+              style={[styles.modeButton, rotateMinutes ? styles.modeActive : null]}
+              onPress={handleToggleCycle}
             >
-              <Text style={styles.modeText}>Start cycling every {DEFAULT_CYCLE_MINUTES} min</Text>
+              <Text style={styles.modeText}>
+                {rotateMinutes
+                  ? "✓ Cycling — tap to stop"
+                  : `Start cycling every ${DEFAULT_CYCLE_MINUTES} min`}
+              </Text>
             </Pressable>
-          )}
+            {autoDayNight ? (
+              <Text style={styles.warnText}>Closed — the Schedule is running</Text>
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.card}>
