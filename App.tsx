@@ -81,7 +81,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v87 · paywall";
+const BUILD_LABEL = "v2 · lenze-v88 · four-across";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -3135,8 +3135,14 @@ const styles = StyleSheet.create({
   themeChip: {
     // Four across rather than three. Sixteen presets at the old size pushed Light Control off
     // the first screen entirely; the swatch is what identifies a preset, and 20px still reads.
-    width: "23%",
-    minWidth: 70,
+    //
+    // 22 rather than 23: four chips plus the grid's three 8px gaps have to fit the row, and at
+    // 23% they overflowed on a 360dp phone and wrapped to three. The iPhone is wide enough to
+    // have hidden it.
+    width: "22%",
+    // No minWidth. Four chips at 70dp plus the grid's three 8dp gaps come to 304dp, which
+    // overflows the ~297dp card on a 360dp phone and wraps the fourth onto its own row — the
+    // floor was what forced three columns, not the percentage.
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: "#2B3557",
