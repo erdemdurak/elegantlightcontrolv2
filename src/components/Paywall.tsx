@@ -39,9 +39,11 @@ const ORDER: ProductKey[] = ["lifetime", "yearly", "monthly"];
 
 type Props = {
   onUnlocked: (entitlement: Entitlement) => void;
+  /** Present only when the paywall was opened voluntarily, so it can be dismissed. */
+  onClose?: () => void;
 };
 
-export function Paywall({ onUnlocked }: Props) {
+export function Paywall({ onUnlocked, onClose }: Props) {
   const [prices, setPrices] = useState<PriceTag[] | null>(null);
   const [busy, setBusy] = useState<ProductKey | "restore" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -147,6 +149,12 @@ export function Paywall({ onUnlocked }: Props) {
           {busy === "restore" ? "Restoring..." : "Restore Purchases"}
         </Text>
       </Pressable>
+
+      {onClose ? (
+        <Pressable style={styles.secondary} disabled={busy !== null} onPress={onClose}>
+          <Text style={styles.secondaryText}>Back to the app</Text>
+        </Pressable>
+      ) : null}
 
       <Text style={styles.legal}>
         Subscriptions renew automatically until cancelled. Cancel any time in your account

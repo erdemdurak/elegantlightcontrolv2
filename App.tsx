@@ -15,6 +15,7 @@ import {
   AppState,
   ActivityIndicator,
   Dimensions,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -62,7 +63,9 @@ import {
 import { hexToHsv, hexToRgb, hsvToHex, hsvToRgb, vibrantSaturation } from "./src/utils/color";
 import { Paywall } from "./src/components/Paywall";
 import {
+  MANAGE_URL,
   loadEntitlement,
+  restore as restorePurchases,
   startPurchaseListeners,
   type Entitlement,
 } from "./src/billing/entitlement";
@@ -81,7 +84,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v91 · trial-offer";
+const BUILD_LABEL = "v2 · lenze-v92 · subscription-section";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -342,6 +345,8 @@ export default function App() {
   const [lastDeviceId, setLastDeviceId] = useState<string | null>(null);
   const [autoDayNight, setAutoDayNight] = useState(false);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [showPlans, setShowPlans] = useState(false);
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
   const [rotateMinutes, setRotateMinutes] = useState<number | null>(null);
   const [cycleThemeIds, setCycleThemeIds] = useState<string[]>([]);
   const [cycleAnchorAt, setCycleAnchorAt] = useState<number | null>(null);
@@ -1273,6 +1278,22 @@ export default function App() {
    * Schedule and Preset Cycle both apply presets on their own, so running both means two
    * things fighting over the cabin. Turning either one on closes the other.
    */
+  const handleRestorePurchases = async () => {
+    setRestoreNote("Checking with the store...");
+
+    try {
+      const result = await restorePurchases();
+      setEntitlement(result);
+      setRestoreNote(
+        result.unlocked
+          ? "Purchase restored."
+          : "No purchase found on this account.",
+      );
+    } catch {
+      setRestoreNote("Could not reach the store.");
+    }
+  };
+
   const handleToggleSchedule = () => {
     setAutoDayNight((prev) => {
       if (!prev) {
@@ -1951,11 +1972,19 @@ export default function App() {
     return <SafeAreaView style={styles.safeArea} />;
   }
 
-  if (!entitlement.unlocked) {
+  if (!entitlement.unlocked || showPlans) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="light-content" />
-        <Paywall onUnlocked={setEntitlement} />
+        <Paywall
+          onUnlocked={(next) => {
+            setEntitlement(next);
+            setShowPlans(false);
+          }}
+          // Dismissable only when the app is already unlocked; otherwise there is nothing
+          // behind the paywall to go back to.
+          onClose={entitlement.unlocked ? () => setShowPlans(false) : undefined}
+        />
       </SafeAreaView>
     );
   }
@@ -2689,8 +2718,40 @@ export default function App() {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.sectionTitle}>6. Subscription</Text>
+          <Text style={styles.helperText}>
+            {entitlement.source === "legacy"
+              ? "You have the full app for free — it was yours before subscriptions existed, and it stays that way."
+              : entitlement.source === "cache"
+                ? "Active. The store could not be reached just now, so this is the last answer it gave."
+                : "Active. Thank you for supporting the app."}
+          </Text>
+
+          <View style={styles.row}>
+            <Pressable style={styles.modeButton} onPress={() => void handleRestorePurchases()}>
+              <Text style={styles.modeText}>Restore Purchases</Text>
+            </Pressable>
+            <Pressable style={styles.modeButton} onPress={() => setShowPlans(true)}>
+              <Text style={styles.modeText}>
+                {entitlement.source === "legacy" ? "See Plans" : "Plans"}
+              </Text>
+            </Pressable>
+            <Pressable style={styles.modeButton} onPress={() => void Linking.openURL(MANAGE_URL)}>
+              <Text style={styles.modeText}>Manage</Text>
+            </Pressable>
+          </View>
+
+          {restoreNote ? <Text style={styles.helperText}>{restoreNote}</Text> : null}
+
+          <Text style={styles.helperText}>
+            Manage opens your store account, which is the only place a subscription can be
+            cancelled. Restore brings a purchase back after reinstalling or on a new device.
+          </Text>
+        </View>
+
+        <View style={styles.card}>
           <Pressable onPress={() => setShowVoice((prev) => !prev)}>
-            <Text style={styles.sectionTitle}>6. Voice Commands {showVoice ? "▾" : "▸"}</Text>
+            <Text style={styles.sectionTitle}>7. Voice Commands {showVoice ? "▾" : "▸"}</Text>
           </Pressable>
 
           {showVoice ? (
