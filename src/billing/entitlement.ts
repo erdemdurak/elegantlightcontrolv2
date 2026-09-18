@@ -156,19 +156,52 @@ export async function loadEntitlement(): Promise<Entitlement> {
   }
 }
 
-/** Buy one of the products. Resolves once the store reports the purchase finished. */
+/**
+ * Buy one of the products.
+ *
+ * `requestPurchase` is event-based: it returns once the store's sheet is done with, but the
+ * purchase itself arrives through `purchaseUpdatedListener` a moment later. Asking the store
+ * what this account owns the instant it returns is a race, and losing it made a completed
+ * purchase report "did not complete" while the listener quietly unlocked the app behind the
+ * message. So poll briefly instead of trusting one immediate answer.
+ */
 export async function purchase(key: ProductKey): Promise<Entitlement> {
   const sku = PRODUCT_IDS[key];
 
   await initConnection();
-  // "apple" and "google" here are the SDK platforms, not the stores.
-  await requestPurchase(
-    key === "lifetime"
-      ? { request: { apple: { sku }, google: { skus: [sku] } }, type: "in-app" }
-      : { request: { apple: { sku }, google: { skus: [sku] } }, type: "subs" },
-  );
 
-  const owned = await queryStore();
+  if (key === "lifetime") {
+    // "apple" and "google" here are the SDK platforms, not the stores.
+    await requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: "in-app" });
+  } else {
+    // Android needs the offer token or Play sells the bare base plan and the free trial is
+    // silently skipped — the sheet then charges immediately while the paywall promised three
+    // free days. Prefer the trial offer; fall back to whatever offer the store returns.
+    const offers = await subscriptionOffersFor(sku);
+    const trial = offers.find((offer) => offer.id === TRIAL_OFFER_ID) ?? offers[0];
+
+    await requestPurchase({
+      request: {
+        apple: { sku },
+        google: trial?.offerTokenAndroid
+          ? { skus: [sku], subscriptionOffers: [{ sku, offerToken: trial.offerTokenAndroid }] }
+          : { skus: [sku] },
+      },
+      type: "subs",
+    });
+  }
+
+  let owned = false;
+  for (let attempt = 0; attempt < 8 && !owned; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 700));
+    }
+    try {
+      owned = await queryStore();
+    } catch {
+      // Keep trying; the store is often briefly unavailable right after a purchase.
+    }
+  }
   const entitlement: Entitlement = {
     unlocked: owned,
     source: owned ? "purchase" : "none",
@@ -243,6 +276,25 @@ export const MANAGE_URL = Platform.select({
   android: "https://play.google.com/store/account/subscriptions",
   default: "https://apps.apple.com/account/subscriptions",
 });
+
+/** The offer id created on both stores; see docs and play-offers.rb. */
+const TRIAL_OFFER_ID = "free-trial-3d";
+
+type StoreOffer = { id?: string; offerTokenAndroid?: string | null };
+
+/** The offers Play knows about for one subscription, used to buy with the trial attached. */
+async function subscriptionOffersFor(sku: string): Promise<StoreOffer[]> {
+  try {
+    const found = (await fetchProducts({ skus: [sku], type: "subs" })) as
+      | Array<{ id?: string; productId?: string; subscriptionOffers?: StoreOffer[] | null }>
+      | null;
+
+    const product = (found ?? []).find((row) => (row.productId ?? row.id) === sku);
+    return product?.subscriptionOffers ?? [];
+  } catch {
+    return [];
+  }
+}
 
 export type PriceTag = {
   key: ProductKey;
