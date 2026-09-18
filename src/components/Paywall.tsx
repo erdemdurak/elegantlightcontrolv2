@@ -28,10 +28,17 @@ const SITE = "https://elegant-ambient.netlify.app";
 const TERMS_URL = `${SITE}/terms`;
 const PRIVACY_URL = `${SITE}/privacy`;
 
+/**
+ * What each tier is, with no claim about a trial.
+ *
+ * Whether a free trial applies is decided by the store, per account, and it is spent once —
+ * so anyone who has subscribed before gets none. Promising "3 days free" in fixed text told
+ * those people something the purchase sheet then contradicted by charging immediately.
+ */
 const LABELS: Record<ProductKey, { title: string; detail: string }> = {
   lifetime: { title: "Lifetime", detail: "One payment. Yours permanently." },
-  yearly: { title: "Yearly", detail: "3 days free, then billed yearly." },
-  monthly: { title: "Monthly", detail: "3 days free, then billed monthly." },
+  yearly: { title: "Yearly", detail: "Billed yearly. Cancel any time." },
+  monthly: { title: "Monthly", detail: "Billed monthly. Cancel any time." },
 };
 
 /** Lifetime first: it is the honest pick for an app with no running costs to fund. */
@@ -129,7 +136,12 @@ export function Paywall({ onUnlocked, onClose }: Props) {
           >
             <View style={styles.tierText}>
               <Text style={styles.tierTitle}>{LABELS[row.key].title}</Text>
-              <Text style={styles.tierDetail}>{LABELS[row.key].detail}</Text>
+              <Text style={styles.tierDetail}>
+                {row.trial ? `${row.trial}, then ` : ""}
+                {row.trial
+                  ? LABELS[row.key].detail.replace(/^Billed/, "billed")
+                  : LABELS[row.key].detail}
+              </Text>
             </View>
             <Text style={styles.tierPrice}>
               {busy === row.key ? "..." : row.displayPrice}
@@ -158,8 +170,9 @@ export function Paywall({ onUnlocked, onClose }: Props) {
 
       <Text style={styles.legal}>
         Subscriptions renew automatically until cancelled. Cancel any time in your account
-        settings, at least 24 hours before the period ends. A free trial that goes unused when a
-        subscription is bought is forfeited. Lifetime is a single payment and does not renew.
+        settings, at least 24 hours before the period ends. Any free period is shown above when
+        your account qualifies for one, and is offered once. Lifetime is a single payment and
+        does not renew.
       </Text>
 
       <View style={styles.links}>

@@ -280,7 +280,60 @@ export const MANAGE_URL = Platform.select({
 /** The offer id created on both stores; see docs and play-offers.rb. */
 const TRIAL_OFFER_ID = "free-trial-3d";
 
-type StoreOffer = { id?: string; offerTokenAndroid?: string | null };
+type StoreOffer = {
+  id?: string;
+  offerTokenAndroid?: string | null;
+  paymentMode?: string | null;
+  period?: { unit?: string; value?: number } | null;
+  periodCount?: number | null;
+  pricingPhasesAndroid?: { pricingPhaseList?: Array<{ billingPeriod?: string; priceAmountMicros?: string }> } | null;
+};
+
+/** "P3D" and friends, as ISO 8601 durations. */
+function describePeriod(unit: string | undefined, value: number): string {
+  if (!unit || value < 1) {
+    return "";
+  }
+
+  const plural = value === 1 ? unit : `${unit}s`;
+  return `${value} ${plural} free`;
+}
+
+function describeIsoPeriod(iso: string | undefined): string {
+  const match = /^P(\d+)([DWMY])$/.exec(iso ?? "");
+  if (!match) {
+    return "";
+  }
+
+  const value = Number(match[1]);
+  const unit = { D: "day", W: "week", M: "month", Y: "year" }[match[2]] ?? "";
+  return describePeriod(unit, value);
+}
+
+/**
+ * The free period this account would actually get, as the store reports it.
+ *
+ * Both platforms describe a trial differently — iOS as a payment mode plus a period, Android
+ * as a first pricing phase costing nothing — and both only report one when this account is
+ * still eligible. Saying "3 days free" to someone who has already used their trial would be a
+ * promise the purchase sheet then breaks.
+ */
+function trialFromOffers(offers: StoreOffer[]): string {
+  for (const offer of offers) {
+    if (offer.paymentMode === "free-trial" && offer.period?.unit) {
+      return describePeriod(offer.period.unit, offer.period.value ?? 1);
+    }
+
+    const free = offer.pricingPhasesAndroid?.pricingPhaseList?.find(
+      (phase) => phase.priceAmountMicros === "0",
+    );
+    if (free) {
+      return describeIsoPeriod(free.billingPeriod);
+    }
+  }
+
+  return "";
+}
 
 /** The offers Play knows about for one subscription, used to buy with the trial attached. */
 async function subscriptionOffersFor(sku: string): Promise<StoreOffer[]> {
@@ -300,6 +353,12 @@ export type PriceTag = {
   key: ProductKey;
   /** Formatted by the store in the viewer's own currency — never hardcode this. */
   displayPrice: string;
+  /**
+   * What the store will actually give this account before charging, e.g. "3 days free".
+   * Empty when there is no trial — which is the truth for anyone who has subscribed before,
+   * since an introductory offer is spent once per account.
+   */
+  trial: string;
 };
 
 /**
@@ -321,15 +380,18 @@ export async function loadPrices(): Promise<PriceTag[]> {
     id?: string;
     productId?: string;
     displayPrice?: string;
-    subscriptionOffers?: Array<{ displayPrice?: string | null }> | null;
+    subscriptionOffers?: Array<StoreOffer & { displayPrice?: string | null }> | null;
   }>;
 
   const byId = new Map<string, string>();
+  const trials = new Map<string, string>();
   for (const row of rows) {
     const id = row.productId ?? row.id;
     if (!id) {
       continue;
     }
+
+    trials.set(id, trialFromOffers(row.subscriptionOffers ?? []));
 
     // A subscription's price lives in its offers on Android — the product-level displayPrice
     // comes back empty, which silently dropped both subscriptions from the paywall and left
@@ -348,6 +410,10 @@ export async function loadPrices(): Promise<PriceTag[]> {
   }
 
   return (Object.keys(PRODUCT_IDS) as ProductKey[])
-    .map((key) => ({ key, displayPrice: byId.get(PRODUCT_IDS[key]) ?? "" }))
+    .map((key) => ({
+      key,
+      displayPrice: byId.get(PRODUCT_IDS[key]) ?? "",
+      trial: trials.get(PRODUCT_IDS[key]) ?? "",
+    }))
     .filter((row) => row.displayPrice.length > 0);
 }

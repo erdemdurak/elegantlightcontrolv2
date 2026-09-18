@@ -84,7 +84,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v92 · subscription-section";
+const BUILD_LABEL = "v2 · lenze-v93 · honest-trial";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
