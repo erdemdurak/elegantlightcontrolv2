@@ -269,13 +269,29 @@ export async function loadPrices(): Promise<PriceTag[]> {
     id?: string;
     productId?: string;
     displayPrice?: string;
+    subscriptionOffers?: Array<{ displayPrice?: string | null }> | null;
   }>;
 
   const byId = new Map<string, string>();
   for (const row of rows) {
     const id = row.productId ?? row.id;
-    if (id && row.displayPrice) {
-      byId.set(id, row.displayPrice);
+    if (!id) {
+      continue;
+    }
+
+    // A subscription's price lives in its offers on Android — the product-level displayPrice
+    // comes back empty, which silently dropped both subscriptions from the paywall and left
+    // only the one-time product showing. Prefer the product price, fall back to the offers.
+    const offers = (row.subscriptionOffers ?? [])
+      .map((offer) => offer?.displayPrice ?? "")
+      .filter((price) => price.length > 0);
+
+    // The free-trial offer prices at zero; the recurring price is the one worth showing.
+    const recurring = offers.find((price) => !/^(free|0[.,]00|₺?0\b)/i.test(price.trim()));
+    const price = row.displayPrice || recurring || offers[0] || "";
+
+    if (price) {
+      byId.set(id, price);
     }
   }
 
