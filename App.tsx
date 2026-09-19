@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
+import Svg, { Circle, Path } from "react-native-svg";
 import ColorPickerRaw from "react-native-wheel-color-picker";
 
 /**
@@ -85,7 +86,62 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v94 · custom-presets";
+/**
+ * The four tabs. Everything the app does belongs to exactly one of them; the sections
+ * themselves are unchanged, they are simply gated on `tab`.
+ *
+ * Connect has no tab of its own: Scan lives in the header, where it is reachable from every
+ * tab and only shows while nothing is connected. Stop, Disconnect and the sweeps are rare
+ * enough to sit under More.
+ *
+ * Icons are inline SVG paths rather than an icon package — four glyphs is not worth a
+ * dependency, and `react-native-svg` is already here.
+ */
+type TabKey = "manual" | "presets" | "schedule" | "more";
+
+type IconName = "sliders" | "grid" | "clock" | "dots";
+
+const TABS: { key: TabKey; label: string; icon: IconName }[] = [
+  { key: "manual", label: "Manual", icon: "sliders" },
+  { key: "presets", label: "Presets", icon: "grid" },
+  { key: "schedule", label: "Schedule", icon: "clock" },
+  { key: "more", label: "More", icon: "dots" },
+];
+
+function TabIcon({ name, color }: { name: IconName; color: string }) {
+  const stroke = { stroke: color, strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      {name === "sliders" ? (
+        <>
+          <Path d="M4 7h8M16 7h4M4 12h4M12 12h8M4 17h12M19 17h1" {...stroke} />
+          <Circle cx={14} cy={7} r={2} {...stroke} />
+          <Circle cx={10} cy={12} r={2} {...stroke} />
+          <Circle cx={17} cy={17} r={2} {...stroke} />
+        </>
+      ) : null}
+      {name === "grid" ? (
+        <Path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" {...stroke} />
+      ) : null}
+      {name === "clock" ? (
+        <>
+          <Circle cx={12} cy={12} r={8.5} {...stroke} />
+          <Path d="M12 7v5.2l3.2 2" {...stroke} />
+        </>
+      ) : null}
+      {name === "dots" ? (
+        <>
+          <Circle cx={5} cy={12} r={1.6} fill={color} />
+          <Circle cx={12} cy={12} r={1.6} fill={color} />
+          <Circle cx={19} cy={12} r={1.6} fill={color} />
+        </>
+      ) : null}
+    </Svg>
+  );
+}
+
+const BUILD_LABEL = "v2 · lenze-v98 · tabs";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -369,12 +425,19 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [tab, setTab] = useState<TabKey>("presets");
   const [statusMessage, setStatusMessage] = useState("Ready. Scan for your controller.");
 
   const [gattEntries, setGattEntries] = useState<GattEntry[]>([]);
   const [notifyLog, setNotifyLog] = useState<string[]>([]);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
-  const [devToolsVisible, setDevToolsVisible] = useState(__DEV__);
+  /**
+   * Off in every build, debug included. It used to default to `__DEV__`, which meant a debug
+   * install on the phone showed the sweeps, Command Lab and Diagnostics in More — four
+   * developer cards above the things actually being tested. The build-stamp tap still
+   * unlocks them when they are wanted.
+   */
+  const [devToolsVisible, setDevToolsVisible] = useState(false);
   const devTapsRef = useRef(0);
   const [showVoice, setShowVoice] = useState(false);
   const [hexInput, setHexInput] = useState("7E 00 05 03 FF 00 00 00 EF");
@@ -1992,6 +2055,70 @@ export default function App() {
     }
   };
 
+  /**
+   * The wheel, rendered in both Light Control and Custom Presets. One definition because it
+   * carries three pieces of drag state; two copies of that would drift.
+   *
+   * Both instances share `pickerActive`, which is correct — only one can be under a finger.
+   */
+  const renderColorWheel = () => (
+    <>
+      <View
+        style={styles.wheelBox}
+        onStartShouldSetResponderCapture={(event) => {
+          // The wheel is a circle in a square box, so roughly a fifth of the box is
+          // dead corner. Claiming those too would stop the page scrolling for no
+          // reason — only a touch that lands on the wheel itself locks the scroll.
+          const radius = WHEEL_SIZE / 2;
+          const dx = event.nativeEvent.locationX - radius;
+          const dy = event.nativeEvent.locationY - radius;
+
+          if (dx * dx + dy * dy > radius * radius) {
+            return false;
+          }
+
+          wheelSeedRef.current = currentColor;
+          draggingRef.current = true;
+          setPickerActive(true);
+          return false;
+        }}
+        onTouchEnd={() => {
+          draggingRef.current = false;
+          setPickerActive(false);
+        }}
+        onTouchCancel={() => {
+          draggingRef.current = false;
+          setPickerActive(false);
+        }}
+      >
+        <ColorPicker
+          style={{ width: WHEEL_SIZE, height: WHEEL_SIZE }}
+          // Frozen mid-drag. The picker animates its thumb back to this prop whenever
+          // it changes, so feeding the live drag colour in here would have it fighting
+          // the finger. It resumes tracking state the moment the touch ends.
+          color={pickerActive ? wheelSeedRef.current : currentColor}
+          onColorChange={handleDragColor}
+          onColorChangeComplete={(finalColor: string) => {
+            if (!draggingRef.current) {
+              return;
+            }
+
+            draggingRef.current = false;
+            setPickerActive(false);
+            handleWheelColor(finalColor, true);
+          }}
+          thumbSize={34}
+          sliderHidden
+          swatches={false}
+          noSnap
+          gapSize={0}
+          useNativeDriver={false}
+        />
+      </View>
+      <Text style={styles.wheelValue}>{normalizeHex(currentColor)}</Text>
+    </>
+  );
+
   const renderSwatch = (color: string, deletable = false) => {
     const isSelected = normalizeHex(color) === normalizeHex(currentColor);
 
@@ -2034,15 +2161,41 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <>
+      {/* Two safe areas so the home-indicator strip can take the bar's colour while the
+          status-bar strip keeps the page's. One SafeAreaView can only paint both the same. */}
+      <SafeAreaView style={styles.safeAreaTop} />
+      <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={styles.container} scrollEnabled={!pickerActive}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.container}
+        scrollEnabled={!pickerActive}
+      >
         <View style={styles.heroCard}>
           <Text style={styles.heroTitle}>{device ? "Connected" : "Not Connected"}</Text>
           <Text style={styles.heroSubtitle}>{device?.name ?? device?.id ?? "No controller"}</Text>
           <Pressable onPress={handleBuildStampTap}>
             <Text style={styles.buildStamp}>Build: {BUILD_LABEL}</Text>
           </Pressable>
+
+          {/* Auto-reconnect does not always take, so Scan is on every tab, and only while there
+              is nothing connected. A scan does not connect by itself — a controller has to be
+              picked from the list — so this also switches to the tab that shows the list. */}
+          {device ? null : (
+            <Pressable
+              style={[styles.heroScan, isScanning || isConnecting ? styles.bigButtonDisabled : null]}
+              disabled={isScanning || isConnecting}
+              onPress={() => {
+                setTab("more");
+                void handleStartScan();
+              }}
+            >
+              <Text style={styles.actionText}>
+                {isScanning ? "Scanning..." : isConnecting ? "Connecting..." : "Scan"}
+              </Text>
+            </Pressable>
+          )}
           {/* No "run the sweep below" fallback when there is no locked profile: the sweep is
               hidden in a release build, so it pointed at a section that is not on screen. */}
           {lockedProfile ? (
@@ -2059,8 +2212,9 @@ export default function App() {
           ) : null}
         </View>
 
+        {tab === "more" ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>1. Connect</Text>
+          <Text style={styles.sectionTitle}>Connect</Text>
           <View style={styles.row}>
             <Pressable style={styles.actionButton} onPress={() => void handleStartScan()}>
               <Text style={styles.actionText}>Scan</Text>
@@ -2089,8 +2243,9 @@ export default function App() {
             ))}
           </View>
         </View>
+        ) : null}
 
-        {devToolsVisible ? (
+        {devToolsVisible && tab === "more" ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Protocol Sweep</Text>
           <Text style={styles.helperText}>
@@ -2198,7 +2353,7 @@ export default function App() {
         </View>
         ) : null}
 
-        {devToolsVisible && lockedProfile ? (
+        {devToolsVisible && lockedProfile && tab === "more" ? (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Area Sweep</Text>
             <Text style={styles.helperText}>
@@ -2262,7 +2417,7 @@ export default function App() {
           </View>
         ) : null}
 
-        {devToolsVisible ? (
+        {devToolsVisible && tab === "more" ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Command Lab</Text>
           <Text style={styles.helperText}>
@@ -2371,8 +2526,9 @@ export default function App() {
         </View>
         ) : null}
 
+        {tab === "presets" ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>2. Presets</Text>
+          <Text style={styles.sectionTitle}>Presets</Text>
 
           <InteriorPreview
             area1Color={area1Color}
@@ -2430,9 +2586,11 @@ export default function App() {
               "Each preset sets both areas at once. Left half of the chip is the door lines, right half the vents."}
           </Text>
         </View>
+        ) : null}
 
+        {tab === "manual" ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>3. Light Control</Text>
+          <Text style={styles.sectionTitle}>Light Control</Text>
 
           <View style={styles.row}>
             {targetOptions.map((option) => (
@@ -2502,59 +2660,7 @@ export default function App() {
           />
 
           <View style={styles.wheelCard}>
-            <View
-              style={styles.wheelBox}
-              onStartShouldSetResponderCapture={(event) => {
-                // The wheel is a circle in a square box, so roughly a fifth of the box is
-                // dead corner. Claiming those too would stop the page scrolling for no
-                // reason — only a touch that lands on the wheel itself locks the scroll.
-                const radius = WHEEL_SIZE / 2;
-                const dx = event.nativeEvent.locationX - radius;
-                const dy = event.nativeEvent.locationY - radius;
-
-                if (dx * dx + dy * dy > radius * radius) {
-                  return false;
-                }
-
-                wheelSeedRef.current = currentColor;
-                draggingRef.current = true;
-                setPickerActive(true);
-                return false;
-              }}
-              onTouchEnd={() => {
-                draggingRef.current = false;
-                setPickerActive(false);
-              }}
-              onTouchCancel={() => {
-                draggingRef.current = false;
-                setPickerActive(false);
-              }}
-            >
-              <ColorPicker
-                style={{ width: WHEEL_SIZE, height: WHEEL_SIZE }}
-                // Frozen mid-drag. The picker animates its thumb back to this prop whenever
-                // it changes, so feeding the live drag colour in here would have it fighting
-                // the finger. It resumes tracking state the moment the touch ends.
-                color={pickerActive ? wheelSeedRef.current : currentColor}
-                onColorChange={handleDragColor}
-                onColorChangeComplete={(finalColor: string) => {
-                  if (!draggingRef.current) {
-                    return;
-                  }
-
-                  draggingRef.current = false;
-                  setPickerActive(false);
-                  handleWheelColor(finalColor, true);
-                }}
-                thumbSize={34}
-                sliderHidden
-                swatches={false}
-                noSnap
-                gapSize={0}
-                useNativeDriver={false}
-              />
-            </View>
-            <Text style={styles.wheelValue}>{normalizeHex(currentColor)}</Text>
+            {renderColorWheel()}
 
             {/* The wheel is nearly a full screen tall, so the preview at the top of Presets
                 has long since scrolled away by the time a colour is being picked. This one
@@ -2654,9 +2760,11 @@ export default function App() {
           />
 
         </View>
+        ) : null}
 
+        {tab === "schedule" ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>4. Schedule</Text>
+          <Text style={styles.sectionTitle}>Schedule</Text>
           <Text style={styles.helperText}>
             Three intervals. Each stores both areas in full — colour, brightness and mode — and
             runs from its start time until the next one begins, the last wrapping past midnight.
@@ -2681,9 +2789,11 @@ export default function App() {
           {[...schedule].sort((a, b) => a.startHour - b.startHour).map(renderSlot)}
 
         </View>
+        ) : null}
 
+        {tab === "schedule" ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>5. Preset Cycle</Text>
+          <Text style={styles.sectionTitle}>Preset Cycle</Text>
           <Text style={styles.helperText}>
             Step through a handful of presets on a timer, fading from one to the next over
             about {Math.round(CROSSFADE_MS / 1000)} seconds. Pick up to {MAX_CYCLE_PRESETS};
@@ -2760,24 +2870,74 @@ export default function App() {
             ) : null}
           </View>
         </View>
+        ) : null}
 
+        {tab === "presets" ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>6. Custom Presets</Text>
+          <Text style={styles.sectionTitle}>Custom Presets</Text>
           <Text style={styles.helperText}>
-            Save the cabin exactly as it is now — both colours, both brightness levels and the
-            mode — and bring it back in one tap. Tune it in Light Control first, then save.
+            Build a cabin here — tap an area, pick its colour — then name it and save. It stores
+            both colours, both brightness levels and the mode, and comes back in one tap.
           </Text>
 
-          <View style={styles.row}>
+          <InteriorPreview
+            area1Color={area1Color}
+            area2Color={area2Color}
+            activeTarget={activeTarget}
+            onSelectArea={setActiveTarget}
+            hideLegend
+          />
+
+          {/* Read-out and area selector in one row: the legend below the preview shows colour
+              but not hex or brightness, and two rows of chips saying the same thing is worse
+              than one row saying all of it. */}
+          <View style={styles.customNow}>
+            <Pressable
+              style={[
+                styles.customNowArea,
+                activeTarget !== "area2" ? styles.customNowAreaActive : null,
+              ]}
+              onPress={() => setActiveTarget("area1")}
+            >
+              <View style={[styles.customNowDot, { backgroundColor: area1Color }]} />
+              <View style={styles.customNowText}>
+                <Text style={styles.customNowLabel}>Doors & console</Text>
+                <Text style={styles.customNowValue}>
+                  {area1Color.toUpperCase()} · {area1.brightness}%
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.customNowArea,
+                activeTarget !== "area1" ? styles.customNowAreaActive : null,
+              ]}
+              onPress={() => setActiveTarget("area2")}
+            >
+              <View style={[styles.customNowDot, { backgroundColor: area2Color }]} />
+              <View style={styles.customNowText}>
+                <Text style={styles.customNowLabel}>Vents & tweeters</Text>
+                <Text style={styles.customNowValue}>
+                  {area2Color.toUpperCase()} · {area2.brightness}%
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+
+          {/* The wheel drives whichever area the cards above select, so a cabin can be built
+              without leaving the section. */}
+          <View style={styles.wheelCard}>{renderColorWheel()}</View>
+
+          <View style={styles.customSaveRow}>
             <TextInput
-              style={styles.hexInput}
+              style={styles.customNameInput}
               value={customName}
               onChangeText={setCustomName}
               placeholder="Name this cabin"
               placeholderTextColor="#5C6B8A"
               maxLength={24}
             />
-            <Pressable style={styles.modeButton} onPress={handleSaveCustomPreset}>
+            <Pressable style={styles.customSaveButton} onPress={handleSaveCustomPreset}>
               <Text style={styles.modeText}>Save Current</Text>
             </Pressable>
           </View>
@@ -2818,9 +2978,11 @@ export default function App() {
             <Text style={styles.helperText}>Hold a preset to delete it.</Text>
           ) : null}
         </View>
+        ) : null}
 
+        {tab === "more" ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>7. Subscription</Text>
+          <Text style={styles.sectionTitle}>Subscription</Text>
           <Text style={styles.helperText}>
             {entitlement.source === "legacy"
               ? "You have the full app for free — it was yours before subscriptions existed, and it stays that way."
@@ -2850,10 +3012,12 @@ export default function App() {
             cancelled. Restore brings a purchase back after reinstalling or on a new device.
           </Text>
         </View>
+        ) : null}
 
+        {tab === "more" ? (
         <View style={styles.card}>
           <Pressable onPress={() => setShowVoice((prev) => !prev)}>
-            <Text style={styles.sectionTitle}>8. Voice Commands {showVoice ? "▾" : "▸"}</Text>
+            <Text style={styles.sectionTitle}>Voice Commands {showVoice ? "▾" : "▸"}</Text>
           </Pressable>
 
           {showVoice ? (
@@ -2903,8 +3067,9 @@ export default function App() {
             </>
           ) : null}
         </View>
+        ) : null}
 
-        {devToolsVisible ? (
+        {devToolsVisible && tab === "more" ? (
         <View style={styles.card}>
           <Pressable onPress={() => setShowDiagnostics((prev) => !prev)}>
             <Text style={styles.sectionTitle}>Diagnostics {showDiagnostics ? "▾" : "▸"}</Text>
@@ -2986,14 +3151,83 @@ export default function App() {
         </View>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+
+      <View style={styles.tabBar}>
+        {TABS.map((entry) => {
+          const active = tab === entry.key;
+
+          return (
+            <Pressable key={entry.key} style={styles.tabItem} onPress={() => setTab(entry.key)}>
+              <View style={[styles.tabIconWrap, active ? styles.tabIconWrapActive : null]}>
+                <TabIcon name={entry.icon} color={active ? "#7FB2FF" : "#6E7CA0"} />
+              </View>
+              <Text style={[styles.tabLabel, active ? styles.tabLabelActive : null]}>
+                {entry.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  /** Status-bar strip: the page's colour. */
+  safeAreaTop: {
+    backgroundColor: "#151B2E",
+  },
+  /** Everything else, including the home-indicator strip under the tab bar. */
   safeArea: {
     flex: 1,
+    backgroundColor: "#1A2340",
+  },
+  scroll: {
+    flex: 1,
     backgroundColor: "#151B2E",
+  },
+  heroScan: {
+    alignSelf: "flex-start",
+    marginTop: 10,
+    backgroundColor: "#1E82F4",
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+  },
+  tabBar: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderTopColor: "#25304F",
+    backgroundColor: "#1A2340",
+    // No bottom padding: the row sits directly on the home-indicator inset the SafeAreaView
+    // already reserves, which is what makes it read as part of the footer rather than
+    // floating above it. iOS will not let anything sit closer than that inset.
+    paddingTop: 6,
+    paddingBottom: 0,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+    // 44pt of height in total with the bar's own padding — Apple's minimum target.
+    paddingVertical: 2,
+  },
+  tabIconWrap: {
+    paddingHorizontal: 14,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  tabIconWrapActive: {
+    backgroundColor: "#24365E",
+  },
+  tabLabel: {
+    color: "#6E7CA0",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  tabLabelActive: {
+    color: "#7FB2FF",
   },
   container: {
     paddingHorizontal: 16,
@@ -3409,6 +3643,75 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     marginTop: 4,
+  },
+  /** What a save would capture right now, so the chip is never a surprise. */
+  customNow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  customNowArea: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2B3557",
+    backgroundColor: "#1B2445",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  customNowAreaActive: {
+    borderColor: "#69A8F7",
+    backgroundColor: "#22325C",
+  },
+  customNowDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#3B4874",
+  },
+  customNowText: {
+    flexShrink: 1,
+    gap: 2,
+  },
+  customNowLabel: {
+    color: "#8FA0C4",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  customNowValue: {
+    color: "#DCE5F8",
+    fontSize: 10,
+    fontFamily: "Courier",
+  },
+  customSaveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  /** Its own style rather than `hexInput`: that one is a 64px-tall box for pasting frames. */
+  customNameInput: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#3B4874",
+    backgroundColor: "#141C36",
+    color: "#DCE5F8",
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    height: 34,
+    fontSize: 13,
+  },
+  customSaveButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#3B4874",
+    backgroundColor: "#232D52",
+    justifyContent: "center",
+    paddingHorizontal: 13,
+    height: 34,
   },
   hexInput: {
     borderRadius: 10,
