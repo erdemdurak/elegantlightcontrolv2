@@ -36,6 +36,7 @@ import {
 import type {
   AmbientMode,
   AppStateSnapshot,
+  CustomPreset,
   DayNightProfile,
   ScheduleSlot,
   ControlTarget,
@@ -84,7 +85,7 @@ import { APP_SPOKEN_NAME, SIRI_COLOR_NAMES, SIRI_MODE_NAMES } from "./src/siriPh
 const STORAGE_KEY = "ambient-light-controller-state";
 
 /** Bump on every build so "which version am I running" is answerable at a glance. */
-const BUILD_LABEL = "v2 · lenze-v93 · honest-trial";
+const BUILD_LABEL = "v2 · lenze-v94 · custom-presets";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -350,6 +351,8 @@ export default function App() {
   const [rotateMinutes, setRotateMinutes] = useState<number | null>(null);
   const [cycleThemeIds, setCycleThemeIds] = useState<string[]>([]);
   const [cycleAnchorAt, setCycleAnchorAt] = useState<number | null>(null);
+  const [customPresets, setCustomPresets] = useState<CustomPreset[]>([]);
+  const [customName, setCustomName] = useState("");
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(defaultSchedule);
   /** Bumped whenever CarPlay is seen active, to re-trigger the reconnect effect. */
   const [carPlayTick, setCarPlayTick] = useState(0);
@@ -452,6 +455,18 @@ export default function App() {
             setRotateMinutes(parsed.rotateMinutes);
           }
 
+          if (Array.isArray(parsed.customPresets)) {
+            setCustomPresets(
+              parsed.customPresets
+                .filter((preset) => preset && typeof preset.id === "string")
+                .map((preset) => ({
+                  ...preset,
+                  area1: normalizeLight(preset.area1),
+                  area2: normalizeLight(preset.area2),
+                })),
+            );
+          }
+
           if (typeof parsed.cycleAnchorAt === "number") {
             setCycleAnchorAt(parsed.cycleAnchorAt);
           }
@@ -526,6 +541,7 @@ export default function App() {
         rotateMinutes,
         cycleThemeIds,
         cycleAnchorAt,
+        customPresets,
         schedule,
       };
       void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -544,6 +560,7 @@ export default function App() {
     rotateMinutes,
     cycleThemeIds,
     cycleAnchorAt,
+    customPresets,
     schedule,
     hydrated,
   ]);
@@ -1278,6 +1295,33 @@ export default function App() {
    * Schedule and Preset Cycle both apply presets on their own, so running both means two
    * things fighting over the cabin. Turning either one on closes the other.
    */
+  /**
+   * Keep the cabin exactly as it stands.
+   *
+   * Both areas are stored in full rather than two hex values, so brightness and mode come back
+   * with the colour — the pair only looks right in the car as a whole.
+   */
+  const handleSaveCustomPreset = () => {
+    const name = customName.trim() || `Custom ${customPresets.length + 1}`;
+
+    setCustomPresets((prev) => [
+      { id: `custom-${Date.now()}`, name, area1: { ...area1 }, area2: { ...area2 } },
+      ...prev,
+    ]);
+    setCustomName("");
+    setStatusMessage(`Saved "${name}".`);
+  };
+
+  const handleApplyCustomPreset = (preset: CustomPreset) => {
+    // Not a built-in, so nothing in the preset grid should look selected.
+    setActiveThemeId(null);
+    applyPair(normalizeLight(preset.area1), normalizeLight(preset.area2), preset.name);
+  };
+
+  const handleDeleteCustomPreset = (id: string) => {
+    setCustomPresets((prev) => prev.filter((preset) => preset.id !== id));
+  };
+
   const handleRestorePurchases = async () => {
     setRestoreNote("Checking with the store...");
 
@@ -2718,7 +2762,65 @@ export default function App() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>6. Subscription</Text>
+          <Text style={styles.sectionTitle}>6. Custom Presets</Text>
+          <Text style={styles.helperText}>
+            Save the cabin exactly as it is now — both colours, both brightness levels and the
+            mode — and bring it back in one tap. Tune it in Light Control first, then save.
+          </Text>
+
+          <View style={styles.row}>
+            <TextInput
+              style={styles.hexInput}
+              value={customName}
+              onChangeText={setCustomName}
+              placeholder="Name this cabin"
+              placeholderTextColor="#5C6B8A"
+              maxLength={24}
+            />
+            <Pressable style={styles.modeButton} onPress={handleSaveCustomPreset}>
+              <Text style={styles.modeText}>Save Current</Text>
+            </Pressable>
+          </View>
+
+          {customPresets.length === 0 ? (
+            <Text style={styles.helperText}>Nothing saved yet.</Text>
+          ) : (
+            <View style={styles.grid}>
+              {customPresets.map((preset) => (
+                <Pressable
+                  key={preset.id}
+                  style={styles.themeChip}
+                  onPress={() => handleApplyCustomPreset(preset)}
+                  onLongPress={() => handleDeleteCustomPreset(preset.id)}
+                  delayLongPress={600}
+                >
+                  <View style={styles.themeSwatch}>
+                    <View
+                      style={[
+                        styles.themeHalf,
+                        { backgroundColor: hsvToHex(preset.area1.hue, preset.area1.saturation, preset.area1.value ?? 100) },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.themeHalf,
+                        { backgroundColor: hsvToHex(preset.area2.hue, preset.area2.saturation, preset.area2.value ?? 100) },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.themeName}>{preset.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {customPresets.length > 0 ? (
+            <Text style={styles.helperText}>Hold a preset to delete it.</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>7. Subscription</Text>
           <Text style={styles.helperText}>
             {entitlement.source === "legacy"
               ? "You have the full app for free — it was yours before subscriptions existed, and it stays that way."
@@ -2751,7 +2853,7 @@ export default function App() {
 
         <View style={styles.card}>
           <Pressable onPress={() => setShowVoice((prev) => !prev)}>
-            <Text style={styles.sectionTitle}>7. Voice Commands {showVoice ? "▾" : "▸"}</Text>
+            <Text style={styles.sectionTitle}>8. Voice Commands {showVoice ? "▾" : "▸"}</Text>
           </Pressable>
 
           {showVoice ? (

@@ -1,5 +1,6 @@
 import CoreBluetooth
 import Foundation
+import UIKit
 
 /**
  A native CoreBluetooth writer for the lighting controller.
@@ -27,6 +28,30 @@ final class AmbientBle: NSObject {
   /// Matches CONTROL_SERVICE_PREFIX / the write characteristic in bleAmbientController.ts.
   private static let serviceUuid = CBUUID(string: "FFB0")
   private static let writeUuid = CBUUID(string: "FFB1")
+
+  /**
+   EXPERIMENT, 2026-09-19. Does iOS wake this app while the phone is locked?
+
+   A suspended app has no timer, which is why preset cycling stops in a pocket. The one wake
+   source available is the controller itself: the vendor's 5833FF01 service floods a constant
+   0x69 heartbeat on 5833FF03, and `bluetooth-central` does wake an app for notifications from a
+   connected peripheral. If those wakes arrive often enough, the cycle can move into Swift and
+   run with the screen off — AmbientBle already writes to the lights with the phone locked.
+
+   Subscribing is the whole experiment. Every tenth notification is logged with elapsed time and
+   whether the app was backgrounded, which answers all three unknowns at once: do wakes arrive,
+   how hard does iOS throttle them, and what does that cost in battery.
+
+     log show --predicate 'process == "ElegantLightControl"' --last 30m --info
+
+   Delete this block and the logging once the question is settled either way.
+   */
+  private static let heartbeatServiceUuid = CBUUID(string: "5833FF01-9B8B-5191-6142-22A4536EF123")
+  private static let heartbeatNotifyUuid = CBUUID(string: "5833FF03-9B8B-5191-6142-22A4536EF123")
+  private static let heartbeatExperiment = true
+
+  private var heartbeatCount = 0
+  private var heartbeatFirstAt: Date?
 
   /// Same pacing as WRITE_GAP_MS in bleAmbientController.ts. The original code blasted ~190
   /// unpaced writes per action and that alone prevented control; do not lower this casually.
@@ -302,7 +327,10 @@ extension AmbientBle: CBCentralManagerDelegate {
   }
 
   func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-    peripheral.discoverServices([AmbientBle.serviceUuid])
+    peripheral.discoverServices(
+      AmbientBle.heartbeatExperiment
+        ? [AmbientBle.serviceUuid, AmbientBle.heartbeatServiceUuid]
+        : [AmbientBle.serviceUuid])
   }
 
   func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral,
@@ -325,6 +353,11 @@ extension AmbientBle: CBCentralManagerDelegate {
 
 extension AmbientBle: CBPeripheralDelegate {
   func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+    if AmbientBle.heartbeatExperiment,
+       let decoy = peripheral.services?.first(where: { $0.uuid == AmbientBle.heartbeatServiceUuid }) {
+      peripheral.discoverCharacteristics([AmbientBle.heartbeatNotifyUuid], for: decoy)
+    }
+
     guard let service = peripheral.services?.first(where: { $0.uuid == AmbientBle.serviceUuid })
     else {
       NSLog("AmbientBle: control service FFB0 not found")
@@ -335,6 +368,21 @@ extension AmbientBle: CBPeripheralDelegate {
 
   func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService,
                   error: Error?) {
+    // EXPERIMENT: the decoy service carries the heartbeat, not the write characteristic, so it
+    // has to be handled before the guard below rejects it.
+    if AmbientBle.heartbeatExperiment, service.uuid == AmbientBle.heartbeatServiceUuid {
+      guard let beat = service.characteristics?.first(where: {
+        $0.uuid == AmbientBle.heartbeatNotifyUuid
+      }) else {
+        NSLog("HEARTBEAT: notify characteristic not found on the decoy service")
+        return
+      }
+
+      peripheral.setNotifyValue(true, for: beat)
+      NSLog("HEARTBEAT: subscribed, waiting for wakes")
+      return
+    }
+
     guard let c = service.characteristics?.first(where: { $0.uuid == AmbientBle.writeUuid }) else {
       NSLog("AmbientBle: write characteristic FFB1 not found")
       return
@@ -351,5 +399,31 @@ extension AmbientBle: CBPeripheralDelegate {
     queue.insert(contentsOf: state.preamble(), at: 0)
     lock.unlock()
     drain()
+  }
+
+  /// EXPERIMENT: one line per tenth wake, so the log alone says whether this is viable.
+  func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
+                  error: Error?) {
+    guard AmbientBle.heartbeatExperiment,
+          characteristic.uuid == AmbientBle.heartbeatNotifyUuid else {
+      return
+    }
+
+    heartbeatCount += 1
+    let now = Date()
+    if heartbeatFirstAt == nil {
+      heartbeatFirstAt = now
+    }
+
+    guard heartbeatCount % 10 == 1 else {
+      return
+    }
+
+    let elapsed = Int(now.timeIntervalSince(heartbeatFirstAt ?? now))
+    DispatchQueue.main.async {
+      let state = UIApplication.shared.applicationState
+      let place = state == .active ? "foreground" : (state == .inactive ? "inactive" : "BACKGROUND")
+      NSLog("HEARTBEAT #\(self.heartbeatCount) at +\(elapsed)s — app is \(place)")
+    }
   }
 }

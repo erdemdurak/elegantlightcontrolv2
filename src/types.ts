@@ -78,6 +78,8 @@ export type AppStateSnapshot = {
    * preset the moment the app is alive again.
    */
   cycleAnchorAt?: number | null;
+  /** Pairs the user saved from the cabin itself, newest first. */
+  customPresets?: CustomPreset[];
   /** Three slots, applied on connect by the clock. */
   schedule?: ScheduleSlot[];
   /** Superseded by `schedule`; still read once so older saves migrate. */
@@ -106,4 +108,17 @@ export type ScheduleSlot = DayNightProfile & {
   id: string;
   name: string;
   startHour: number;
+};
+
+/**
+ * A cabin the user liked enough to keep.
+ *
+ * Stores both areas in full rather than a pair of hex values, so brightness and mode come back
+ * exactly as they were — the same reason ScheduleSlot does it.
+ */
+export type CustomPreset = {
+  id: string;
+  name: string;
+  area1: LightSettings;
+  area2: LightSettings;
 };
