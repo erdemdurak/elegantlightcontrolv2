@@ -21,12 +21,14 @@ import {
  */
 
 /**
- * The pages in `web/`, deployed to Netlify. Apple checks both links during review, so they
- * have to resolve — change SITE here if the Netlify site is named differently.
+ * Apple checks both links during review, so they have to resolve. They point at the copies in
+ * this repository rather than the Netlify site: that site went down without anyone noticing,
+ * and the first sign was a rejection. GitHub serves these for as long as the repo exists, and
+ * the store's own privacy-policy field already points at the same place.
  */
-const SITE = "https://elegant-ambient.netlify.app";
-const TERMS_URL = `${SITE}/terms`;
-const PRIVACY_URL = `${SITE}/privacy`;
+const REPO = "https://github.com/erdemdurak/elegantlightcontrolv2/blob/master/docs";
+const TERMS_URL = `${REPO}/terms-of-use.md`;
+const PRIVACY_URL = `${REPO}/privacy-policy.md`;
 
 /**
  * What each tier is, with no claim about a trial.

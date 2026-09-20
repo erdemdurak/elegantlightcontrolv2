@@ -141,7 +141,7 @@ function TabIcon({ name, color }: { name: IconName; color: string }) {
   );
 }
 
-const BUILD_LABEL = "v2 · lenze-v98 · tabs";
+const BUILD_LABEL = "v2 · lenze-v99 · tabs";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were

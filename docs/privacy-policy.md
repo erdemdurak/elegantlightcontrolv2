@@ -5,8 +5,10 @@
 Elegant Ambient ("the app") controls Bluetooth LE ambient lighting hardware installed in a
 vehicle cabin.
 
-> Published at https://elegant-ambient.netlify.app/privacy — `web/privacy.html` in this repo is
-> the deployed copy, and the two must be changed together.
+> This file is the link the stores and the app are given: GitHub serves it, and it cannot go
+> down independently of the repository. The Netlify site it used to point at vanished without
+> anyone noticing. `web/privacy.html` is the same text as a web page, for whenever a site is
+> hosted again; the two must be changed together.
 
 ## What the app collects
 
