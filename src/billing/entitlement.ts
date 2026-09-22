@@ -31,7 +31,11 @@ export type ProductKey = keyof typeof PRODUCT_IDS;
 export const SUBSCRIPTION_IDS = [PRODUCT_IDS.monthly, PRODUCT_IDS.yearly];
 export const ALL_PRODUCT_IDS = Object.values(PRODUCT_IDS);
 
-export type EntitlementSource = "purchase" | "legacy" | "cache" | "none";
+/**
+ * `unavailable`: the store answered but has nothing to sell, so the app is left open for this
+ * session. Never cached — the next launch asks again.
+ */
+export type EntitlementSource = "purchase" | "legacy" | "cache" | "unavailable" | "none";
 
 export type Entitlement = {
   unlocked: boolean;
@@ -143,6 +147,17 @@ export async function loadEntitlement(): Promise<Entitlement> {
   try {
     await initConnection();
     const owned = await queryStore();
+
+    // A store with nothing on sale is not a reason to lock the cabin. It happened for real:
+    // iOS 1.5 was approved and released while its subscriptions were still unreviewed, so
+    // every new install met a paywall with no way through it. If the store offers no
+    // products at all, let this session in and ask again next launch — not cached, so the
+    // paywall returns by itself once the products are live.
+    if (!owned && (await loadPrices()).length === 0) {
+      console.warn("[entitlement] store returned no products; leaving the app open this session");
+      return { unlocked: true, source: "unavailable", checkedAt: Date.now() };
+    }
+
     const fresh: Entitlement = {
       unlocked: owned,
       source: owned ? "purchase" : "none",

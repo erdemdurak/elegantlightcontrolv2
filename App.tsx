@@ -141,7 +141,7 @@ function TabIcon({ name, color }: { name: IconName; color: string }) {
   );
 }
 
-const BUILD_LABEL = "v2 · lenze-v99 · tabs";
+const BUILD_LABEL = "v2 · lenze-v100 · open-if-no-plans";
 
 /**
  * Protocol Sweep, Area Sweep, Command Lab and Diagnostics are identification tools — they were
@@ -2988,7 +2988,9 @@ export default function App() {
               ? "You have the full app for free — it was yours before subscriptions existed, and it stays that way."
               : entitlement.source === "cache"
                 ? "Active. The store could not be reached just now, so this is the last answer it gave."
-                : "Active. Thank you for supporting the app."}
+                : entitlement.source === "unavailable"
+                  ? "Open for now. The store has no plans on sale yet, so nothing is charged; this is checked again each time the app starts."
+                  : "Active. Thank you for supporting the app."}
           </Text>
 
           <View style={styles.row}>
