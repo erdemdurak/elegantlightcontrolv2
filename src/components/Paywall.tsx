@@ -36,11 +36,16 @@ const PRIVACY_URL = `${REPO}/privacy-policy.md`;
  * Whether a free trial applies is decided by the store, per account, and it is spent once —
  * so anyone who has subscribed before gets none. Promising "3 days free" in fixed text told
  * those people something the purchase sheet then contradicted by charging immediately.
+ *
+ * `period` sits next to the price so the amount reads as a complete charge — "$9.99 per year",
+ * not a bare number. Apple rejected 1.6 under 3.1.2(c) because the billed amount was no more
+ * prominent than the tier name and the free trial was read first; the billed amount has to be
+ * the loudest thing here, and everything else subordinate to it in size and position.
  */
-const LABELS: Record<ProductKey, { title: string; detail: string }> = {
-  lifetime: { title: "Lifetime", detail: "One payment. Yours permanently." },
-  yearly: { title: "Yearly", detail: "Billed yearly. Cancel any time." },
-  monthly: { title: "Monthly", detail: "Billed monthly. Cancel any time." },
+const LABELS: Record<ProductKey, { title: string; period: string; detail: string }> = {
+  lifetime: { title: "Lifetime", period: "one payment", detail: "Yours permanently. Does not renew." },
+  yearly: { title: "Yearly", period: "per year", detail: "Renews yearly until cancelled." },
+  monthly: { title: "Monthly", period: "per month", detail: "Renews monthly until cancelled." },
 };
 
 /** Lifetime first: it is the honest pick for an app with no running costs to fund. */
@@ -136,17 +141,20 @@ export function Paywall({ onUnlocked, onClose }: Props) {
             disabled={busy !== null}
             onPress={() => handleBuy(row.key)}
           >
-            <View style={styles.tierText}>
-              <Text style={styles.tierTitle}>{LABELS[row.key].title}</Text>
-              <Text style={styles.tierDetail}>
-                {row.trial ? `${row.trial}, then ` : ""}
-                {row.trial
-                  ? LABELS[row.key].detail.replace(/^Billed/, "billed")
-                  : LABELS[row.key].detail}
+            <Text style={styles.tierTitle}>{LABELS[row.key].title}</Text>
+
+            {/* The charge, and nothing above it. */}
+            <View style={styles.priceLine}>
+              <Text style={styles.tierPrice}>
+                {busy === row.key ? "..." : row.displayPrice}
               </Text>
+              <Text style={styles.tierPeriod}>{LABELS[row.key].period}</Text>
             </View>
-            <Text style={styles.tierPrice}>
-              {busy === row.key ? "..." : row.displayPrice}
+
+            <Text style={styles.tierDetail}>
+              {row.trial
+                ? `${LABELS[row.key].detail} Your first ${row.trial.replace(/ free$/, "")} are free; you are charged ${row.displayPrice} when the free period ends.`
+                : LABELS[row.key].detail}
             </Text>
           </Pressable>
         ))
@@ -215,36 +223,43 @@ const styles = StyleSheet.create({
     marginVertical: 24,
   },
   tier: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: "#2B3557",
     backgroundColor: "#1D2748",
     padding: 16,
-    gap: 12,
+    gap: 4,
   },
   tierFeatured: {
     borderColor: "#7FB2FF",
   },
-  tierText: {
-    flexShrink: 1,
-    gap: 3,
-  },
+  /** Subordinate to the price: smaller, and in the muted colour. */
   tierTitle: {
-    color: "#F2F6FF",
-    fontSize: 17,
+    color: "#A9B7D6",
+    fontSize: 13,
     fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  priceLine: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  tierPrice: {
+    color: "#FFFFFF",
+    fontSize: 30,
+    fontWeight: "800",
+  },
+  tierPeriod: {
+    color: "#DCE5F8",
+    fontSize: 15,
+    fontWeight: "600",
   },
   tierDetail: {
     color: "#A9B7D6",
     fontSize: 12,
-  },
-  tierPrice: {
-    color: "#F2F6FF",
-    fontSize: 17,
-    fontWeight: "800",
+    lineHeight: 17,
   },
   secondary: {
     alignItems: "center",
