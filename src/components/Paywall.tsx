@@ -51,6 +51,22 @@ const LABELS: Record<ProductKey, { title: string; period: string; detail: string
 /** Lifetime first: it is the honest pick for an app with no running costs to fund. */
 const ORDER: ProductKey[] = ["lifetime", "yearly", "monthly"];
 
+/**
+ * "Your first week is free" rather than "Your first 1 week are free".
+ *
+ * The store decides the wording's subject: a 3-day trial comes back as "3 days free" and a
+ * one-week trial as "1 week free", so the sentence has to agree with whichever it is. The
+ * trial moved from three days to a week on 17 October and the old phrasing read as broken.
+ */
+function trialSentence(trial: string, price: string): string {
+  const period = trial.replace(/ free$/, "");
+  const single = period.startsWith("1 ");
+
+  return single
+    ? `Your first ${period.slice(2)} is free; you are charged ${price} when it ends.`
+    : `Your first ${period} are free; you are charged ${price} when the free period ends.`;
+}
+
 type Props = {
   onUnlocked: (entitlement: Entitlement) => void;
   /** Present only when the paywall was opened voluntarily, so it can be dismissed. */
@@ -152,9 +168,7 @@ export function Paywall({ onUnlocked, onClose }: Props) {
             </View>
 
             <Text style={styles.tierDetail}>
-              {row.trial
-                ? `${LABELS[row.key].detail} Your first ${row.trial.replace(/ free$/, "")} are free; you are charged ${row.displayPrice} when the free period ends.`
-                : LABELS[row.key].detail}
+              {row.trial ? `${LABELS[row.key].detail} ${trialSentence(row.trial, row.displayPrice)}` : LABELS[row.key].detail}
             </Text>
           </Pressable>
         ))
